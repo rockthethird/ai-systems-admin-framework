@@ -1,0 +1,262 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 AI Systems Admin Framework Contributors
+#
+# This is a template for /etc/sudoers.d/ai-auditor
+# DEPLOYMENT: Use visudo or copy and validate with: sudo visudo -c -f /etc/sudoers.d/ai-auditor
+
+# ========================================
+# AI AUDITOR SUDOERS CONFIGURATION
+# ========================================
+# Purpose: Allow ai-auditor service account to execute read-only audit commands
+# Created: 2026-08-05
+# Review Frequency: Monthly
+# Last Reviewed: 2026-08-05
+#
+# SECURITY NOTES:
+# - NOPASSWD: Account runs without password (relies on SSH key auth)
+# - No shell access: Cannot spawn interactive shells
+# - env_reset: Environment variables cleaned for security
+# - Explicit DENY: All non-listed commands denied at end
+
+# ========================================
+# DEFAULTS - Security Configuration
+# ========================================
+
+# Logging configuration
+Defaults:ai-auditor logfile="/var/log/sudo-ai-auditor.log"
+Defaults:ai-auditor log_output="/var/log/sudo-ai-auditor.log"
+Defaults:ai-auditor requiretty
+
+# Remove requiretty for automation (ai-auditor will not have shell)
+Defaults:ai-auditor !requiretty
+
+# Disable PTY allocation (security hardening)
+Defaults:ai-auditor !use_pty
+
+# Clean environment and set safe defaults
+Defaults:ai-auditor env_reset
+Defaults:ai-auditor secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Defaults:ai-auditor env_keep="LANGUAGE LANG LC_*"
+
+# Log level for debugging/auditing
+Defaults:ai-auditor log_host="localhost"
+
+# ========================================
+# COMMAND ALIASES - Organized by Function
+# ========================================
+
+# --- System Information ---
+# Purpose: Gather OS version, kernel, hostname information
+# Risk: LOW (public information, read-only)
+Cmnd_Alias SYSTEM_INFO = \
+    /usr/bin/uname, \
+    /usr/bin/uname -a, \
+    /bin/uname, \
+    /bin/uname -a, \
+    /usr/bin/lsb_release, \
+    /usr/bin/lsb_release -a, \
+    /usr/bin/lsb_release -d, \
+    /bin/hostname, \
+    /usr/bin/hostname, \
+    /usr/bin/hostnamectl, \
+    /usr/bin/hostnamectl status
+
+# --- Network Configuration (Read-Only) ---
+# Purpose: Inspect network interfaces, routes, listening ports
+# Risk: MEDIUM (reveals configuration but read-only)
+# Restrictions: List only (-L, -n), no modifications
+Cmnd_Alias NETWORK_STATUS = \
+    /usr/sbin/ip, \
+    /usr/sbin/ip addr, \
+    /usr/sbin/ip addr show, \
+    /usr/sbin/ip link, \
+    /usr/sbin/ip link show, \
+    /usr/sbin/ip route, \
+    /usr/sbin/ip route show, \
+    /bin/ip addr show, \
+    /bin/ip link show, \
+    /bin/ip route show, \
+    /usr/sbin/ss -tulnap, \
+    /usr/sbin/ss -tlnp, \
+    /usr/sbin/ss -tunap, \
+    /bin/ss -tulnap, \
+    /bin/ss -tlnp, \
+    /bin/ss -tunap, \
+    /bin/netstat -tulnap, \
+    /bin/netstat -tlnp, \
+    /bin/netstat -tunap, \
+    /usr/bin/netstat -tulnap, \
+    /usr/bin/netstat -tlnp, \
+    /usr/bin/netstat -tunap, \
+    /sbin/iptables -L, \
+    /sbin/iptables -L -n, \
+    /sbin/iptables -L -v, \
+    /sbin/ip6tables -L, \
+    /sbin/ip6tables -L -n, \
+    /usr/sbin/iptables -L, \
+    /usr/sbin/iptables -L -n, \
+    /usr/sbin/ip6tables -L, \
+    /usr/sbin/ip6tables -L -n
+
+# --- Process & System Status ---
+# Purpose: Inspect running processes and services
+# Risk: LOW (read-only status information)
+# Restrictions: Query only, cannot send signals or modify
+Cmnd_Alias PROCESS_STATUS = \
+    /usr/bin/ps, \
+    /usr/bin/ps aux, \
+    /usr/bin/ps -ef, \
+    /bin/ps, \
+    /bin/ps aux, \
+    /bin/ps -ef, \
+    /usr/bin/top -b, \
+    /usr/bin/top -b -n 1, \
+    /usr/bin/systemctl, \
+    /usr/bin/systemctl status, \
+    /usr/bin/systemctl list-units, \
+    /usr/bin/systemctl list-units --type=service, \
+    /usr/bin/systemctl list-services, \
+    /usr/bin/systemctl show *, \
+    /usr/bin/systemctl is-enabled *, \
+    /usr/bin/systemctl is-active *, \
+    /sbin/systemctl status, \
+    /sbin/systemctl list-units, \
+    /sbin/systemctl show *, \
+    /bin/systemctl status, \
+    /bin/systemctl list-units
+
+# --- File Inspection (Read-Only, Path Restricted) ---
+# Purpose: Inspect files for auditing, with path restrictions
+# Risk: HIGH (potential information disclosure)
+# Restrictions: Only readable files, only specific paths (/etc, /var/log, /opt)
+Cmnd_Alias FILE_INSPECT = \
+    /usr/bin/find /etc -type f -readable, \
+    /usr/bin/find /etc -type f -readable *, \
+    /usr/bin/find /var/log -type f -readable, \
+    /usr/bin/find /var/log -type f -readable *, \
+    /usr/bin/find /opt -type f -readable, \
+    /usr/bin/find /opt -type f -readable *, \
+    /bin/find /etc -type f -readable, \
+    /bin/find /etc -type f -readable *, \
+    /bin/find /var/log -type f -readable, \
+    /bin/find /var/log -type f -readable *, \
+    /bin/find /opt -type f -readable, \
+    /bin/find /opt -type f -readable *, \
+    /bin/ls, \
+    /bin/ls *, \
+    /bin/ls -la, \
+    /usr/bin/ls, \
+    /usr/bin/ls *, \
+    /usr/bin/ls -la, \
+    /usr/bin/file, \
+    /usr/bin/file *, \
+    /bin/file, \
+    /bin/file *, \
+    /usr/bin/stat, \
+    /usr/bin/stat *, \
+    /bin/stat, \
+    /bin/stat *
+
+# --- Package Management (Query Only) ---
+# Purpose: Audit installed packages and versions
+# Risk: LOW (read-only queries only)
+# Restrictions: Query/list only, no install/remove/upgrade
+Cmnd_Alias PACKAGE_QUERY = \
+    /usr/bin/dpkg -l, \
+    /usr/bin/dpkg --list, \
+    /usr/bin/dpkg -l *, \
+    /usr/bin/dpkg -L *, \
+    /usr/bin/apt list --installed, \
+    /usr/bin/apt list --installed *, \
+    /usr/bin/rpm -qa, \
+    /usr/bin/rpm -qa *, \
+    /usr/bin/rpm -qi *, \
+    /usr/bin/rpm -ql *
+
+# --- Log Inspection (Path Restricted) ---
+# Purpose: Review system and application logs
+# Risk: HIGH (contains sensitive information, but read-only)
+# Restrictions: Only specific log files and directories
+Cmnd_Alias LOG_INSPECT = \
+    /usr/bin/journalctl, \
+    /usr/bin/journalctl -n 100, \
+    /usr/bin/journalctl -n *, \
+    /usr/bin/journalctl -u *, \
+    /usr/bin/journalctl -b, \
+    /usr/bin/journalctl -e, \
+    /usr/bin/journalctl --no-pager, \
+    /usr/bin/journalctl -o *, \
+    /usr/bin/tail -f /var/log/syslog, \
+    /usr/bin/tail -f /var/log/auth.log, \
+    /usr/bin/tail -f /var/log/messages, \
+    /usr/bin/tail -f /var/log/*.log, \
+    /bin/tail -f /var/log/syslog, \
+    /bin/tail -f /var/log/auth.log, \
+    /bin/tail -f /var/log/messages, \
+    /bin/tail -f /var/log/*.log, \
+    /usr/bin/grep *, \
+    /bin/grep *
+
+# --- Service Management (Status Only) ---
+# Purpose: Check service status, enablement
+# Risk: LOW (read-only status queries only)
+# Restrictions: Status only, cannot start/stop/restart/reload
+Cmnd_Alias SERVICE_STATUS = \
+    /usr/sbin/service * status, \
+    /sbin/service * status, \
+    /bin/service * status, \
+    /usr/bin/service * status
+
+# --- Security & Capability Auditing ---
+# Purpose: Audit Linux capabilities, SUID binaries, sudo configuration
+# Risk: MEDIUM (reveals potential escalation paths but read-only)
+# Restrictions: Capability checks and configuration review only
+Cmnd_Alias SECURITY_AUDIT = \
+    /usr/sbin/getcap, \
+    /usr/sbin/getcap -r /usr/bin, \
+    /usr/sbin/getcap -r /usr/local/bin, \
+    /usr/sbin/getcap -r /sbin, \
+    /usr/sbin/getcap -r /usr/sbin, \
+    /usr/sbin/getcap -r *, \
+    /sbin/getcap *, \
+    /bin/find /etc/sudoers.d -type f, \
+    /usr/bin/find /etc/sudoers.d -type f, \
+    /bin/cat /etc/sudoers.d/*, \
+    /usr/bin/cat /etc/sudoers.d/*
+
+# ========================================
+# USER PERMISSION GRANTS - ai-auditor
+# ========================================
+
+# Allow execution of all defined command aliases WITHOUT password
+ai-auditor ALL=(ALL) NOPASSWD: SYSTEM_INFO
+ai-auditor ALL=(ALL) NOPASSWD: NETWORK_STATUS
+ai-auditor ALL=(ALL) NOPASSWD: PROCESS_STATUS
+ai-auditor ALL=(ALL) NOPASSWD: FILE_INSPECT
+ai-auditor ALL=(ALL) NOPASSWD: PACKAGE_QUERY
+ai-auditor ALL=(ALL) NOPASSWD: LOG_INSPECT
+ai-auditor ALL=(ALL) NOPASSWD: SERVICE_STATUS
+ai-auditor ALL=(ALL) NOPASSWD: SECURITY_AUDIT
+
+# ========================================
+# DENY ALL OTHER COMMANDS
+# ========================================
+# This explicit deny is critical security:
+# If a command is not explicitly listed above, it is DENIED.
+# This fail-secure approach ensures no accidental privilege grants.
+
+ai-auditor ALL=(ALL) DENY: ALL
+
+# ========================================
+# END OF SUDOERS CONFIGURATION
+# ========================================
+# To deploy:
+# 1. Copy this file to /etc/sudoers.d/ai-auditor
+# 2. Run: sudo visudo -c -f /etc/sudoers.d/ai-auditor
+# 3. Verify: cat /etc/sudoers.d/ai-auditor
+#
+# To test:
+# 1. sudo -u ai-auditor sudo ps aux    # Should work
+# 2. sudo -u ai-auditor sudo apt list  # Should work
+# 3. sudo -u ai-auditor sudo reboot    # Should fail
+# 4. sudo -u ai-auditor sudo passwd    # Should fail

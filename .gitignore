@@ -1,0 +1,78 @@
+# Environment & Configuration
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+id_rsa*
+!id_rsa.pub
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+*.pid
+
+# Test outputs
+test-results.log
+test-results/
+coverage/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Credentials (never commit!)
+credentials.txt
+secrets.yaml
+config.private.yml
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate*
+
+# Docker
+docker-compose.override.yml
+
+# SSH keys (keep templates, not actual keys)
+!templates/**/*.key
+!templates/**/*.pem
+
+# Node (if used)
+node_modules/
+package-lock.json
+
+# Python (if used)
+__pycache__/
+*.pyc
+venv/
+env/
+
+# Build artifacts
+dist/
+build/
+*.o
+*.so
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Vim
+.vim/
+.swapfile
+
+# Local testing
+local/
+sandbox/
+test-env/
