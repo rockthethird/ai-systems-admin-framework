@@ -253,14 +253,27 @@ sudo bash 30-configure-sudoers.sh -v
 bash 30-configure-sudoers.sh -h
 ```
 
+**Prerequisites:**
+- Script 10 must have been run first (creates ai-auditor user)
+- Optional: `visudo` command for syntax validation
+  - Available on most Linux systems (part of 'sudo' package)
+  - If not available on minimal systems (like Synology), script continues with basic validation
+  - Install with: `sudo apt-get install sudo` (or equivalent for your OS)
+  - Recommended for safety, but not required for Phase 1
+
 **Actions:**
 - Deploys sudoers template to `/etc/sudoers.d/ai-auditor`
-- Validates syntax with `visudo -c`
+- Validates syntax with `visudo -c` (if available)
+- If visudo unavailable: Performs basic validation (file exists, permissions, content)
 - Restricts to single command: `uname -a`
 - Sets NOPASSWD, env_reset, secure_path
 - Creates backup of existing sudoers before overwriting
 
-**Verification:** Checks sudoers permissions and syntax
+**Validation:**
+- With visudo: Full syntax validation (recommended)
+- Without visudo: Basic validation (file permissions, content checks)
+  - Safe for minimal systems (Synology, busybox, etc.)
+  - Warning displayed if visudo not found
 
 **Idempotent:** Backs up existing sudoers before overwriting; safe to run multiple times
 

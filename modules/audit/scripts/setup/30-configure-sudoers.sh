@@ -85,6 +85,7 @@ PREREQUISITES
 
 DEPENDENCIES
     - Requires config/sudoers-ai-auditor-template file (from repo root)
+    - Optional: visudo (for syntax validation; skip on minimal systems)
 
 EOF
 }
@@ -110,6 +111,16 @@ parse_parameters() {
 }
 
 parse_parameters "$@"
+
+################################################################################
+# Check for Optional Tools
+################################################################################
+
+# Check if visudo is available (optional)
+HAVE_VISUDO=false
+if command -v visudo &>/dev/null; then
+    HAVE_VISUDO=true
+fi
 
 ################################################################################
 # Step 1: Verify Prerequisites
@@ -179,6 +190,13 @@ deploy_sudoers() {
 
 validate_sudoers_syntax() {
     log_info "Step 4: Validating sudoers syntax"
+    
+    # Skip validation if visudo not available
+    if [ "$HAVE_VISUDO" = false ]; then
+        log_warn "visudo not available - skipping syntax validation"
+        log_warn "(Install 'sudo' package for syntax validation)"
+        return 0
+    fi
     
     # Use visudo to check syntax
     if visudo -c -f "$SUDOERS_FILE" &>/dev/null; then
@@ -255,12 +273,16 @@ verify_deployment() {
         ((errors++))
     fi
     
-    # Validate syntax one more time
-    if visudo -c -f "$SUDOERS_FILE" &>/dev/null; then
-        log_info "✓ Sudoers syntax valid"
+    # Validate syntax one more time (if visudo available)
+    if [ "$HAVE_VISUDO" = true ]; then
+        if visudo -c -f "$SUDOERS_FILE" &>/dev/null; then
+            log_info "✓ Sudoers syntax valid"
+        else
+            log_error "Sudoers syntax invalid"
+            ((errors++))
+        fi
     else
-        log_error "Sudoers syntax invalid"
-        ((errors++))
+        log_warn "✓ Syntax validation skipped (visudo not available)"
     fi
     
     return $errors
