@@ -24,13 +24,9 @@
 
 # Logging configuration
 Defaults:ai-auditor logfile="/var/log/sudo-ai-auditor.log"
-Defaults:ai-auditor log_output="/var/log/sudo-ai-auditor.log"
-Defaults:ai-auditor requiretty
 
-# Remove requiretty for automation (ai-auditor will not have shell)
+# Disable PTY allocation (security hardening) and disable terminal requirement for automation
 Defaults:ai-auditor !requiretty
-
-# Disable PTY allocation (security hardening)
 Defaults:ai-auditor !use_pty
 
 # Clean environment and set safe defaults
@@ -38,8 +34,8 @@ Defaults:ai-auditor env_reset
 Defaults:ai-auditor secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Defaults:ai-auditor env_keep="LANGUAGE LANG LC_*"
 
-# Log level for debugging/auditing
-Defaults:ai-auditor log_host="localhost"
+# Explicitly block dangerous environment variables
+Defaults:ai-auditor env_delete="LD_PRELOAD LD_LIBRARY_PATH PYTHONPATH PATH_ORIG LD_AUDIT LD_DEBUG"
 
 # ========================================
 # COMMAND ALIASES - Organized by Function
@@ -111,19 +107,10 @@ Cmnd_Alias PROCESS_STATUS = \
     /bin/ps -ef, \
     /usr/bin/top -b, \
     /usr/bin/top -b -n 1, \
-    /usr/bin/systemctl, \
     /usr/bin/systemctl status, \
     /usr/bin/systemctl list-units, \
     /usr/bin/systemctl list-units --type=service, \
-    /usr/bin/systemctl list-services, \
-    /usr/bin/systemctl show *, \
-    /usr/bin/systemctl is-enabled *, \
-    /usr/bin/systemctl is-active *, \
-    /sbin/systemctl status, \
-    /sbin/systemctl list-units, \
-    /sbin/systemctl show *, \
-    /bin/systemctl status, \
-    /bin/systemctl list-units
+    /usr/bin/systemctl list-units --type=service --all
 
 # --- File Inspection (Read-Only, Path Restricted) ---
 # Purpose: Inspect files for auditing, with path restrictions
@@ -131,31 +118,25 @@ Cmnd_Alias PROCESS_STATUS = \
 # Restrictions: Only readable files, only specific paths (/etc, /var/log, /opt)
 Cmnd_Alias FILE_INSPECT = \
     /usr/bin/find /etc -type f -readable, \
-    /usr/bin/find /etc -type f -readable *, \
     /usr/bin/find /var/log -type f -readable, \
-    /usr/bin/find /var/log -type f -readable *, \
     /usr/bin/find /opt -type f -readable, \
-    /usr/bin/find /opt -type f -readable *, \
     /bin/find /etc -type f -readable, \
-    /bin/find /etc -type f -readable *, \
     /bin/find /var/log -type f -readable, \
-    /bin/find /var/log -type f -readable *, \
     /bin/find /opt -type f -readable, \
-    /bin/find /opt -type f -readable *, \
     /bin/ls, \
-    /bin/ls *, \
     /bin/ls -la, \
+    /bin/ls -la /etc, \
+    /bin/ls -la /var/log, \
+    /bin/ls -la /opt, \
     /usr/bin/ls, \
-    /usr/bin/ls *, \
     /usr/bin/ls -la, \
+    /usr/bin/ls -la /etc, \
+    /usr/bin/ls -la /var/log, \
+    /usr/bin/ls -la /opt, \
     /usr/bin/file, \
-    /usr/bin/file *, \
     /bin/file, \
-    /bin/file *, \
     /usr/bin/stat, \
-    /usr/bin/stat *, \
-    /bin/stat, \
-    /bin/stat *
+    /bin/stat
 
 # --- Package Management (Query Only) ---
 # Purpose: Audit installed packages and versions
@@ -164,38 +145,27 @@ Cmnd_Alias FILE_INSPECT = \
 Cmnd_Alias PACKAGE_QUERY = \
     /usr/bin/dpkg -l, \
     /usr/bin/dpkg --list, \
-    /usr/bin/dpkg -l *, \
-    /usr/bin/dpkg -L *, \
     /usr/bin/apt list --installed, \
-    /usr/bin/apt list --installed *, \
     /usr/bin/rpm -qa, \
-    /usr/bin/rpm -qa *, \
-    /usr/bin/rpm -qi *, \
-    /usr/bin/rpm -ql *
+    /usr/bin/rpm -qi, \
+    /usr/bin/rpm -ql
 
 # --- Log Inspection (Path Restricted) ---
 # Purpose: Review system and application logs
 # Risk: HIGH (contains sensitive information, but read-only)
 # Restrictions: Only specific log files and directories
 Cmnd_Alias LOG_INSPECT = \
-    /usr/bin/journalctl, \
     /usr/bin/journalctl -n 100, \
-    /usr/bin/journalctl -n *, \
-    /usr/bin/journalctl -u *, \
     /usr/bin/journalctl -b, \
-    /usr/bin/journalctl -e, \
     /usr/bin/journalctl --no-pager, \
-    /usr/bin/journalctl -o *, \
     /usr/bin/tail -f /var/log/syslog, \
     /usr/bin/tail -f /var/log/auth.log, \
     /usr/bin/tail -f /var/log/messages, \
-    /usr/bin/tail -f /var/log/*.log, \
     /bin/tail -f /var/log/syslog, \
     /bin/tail -f /var/log/auth.log, \
     /bin/tail -f /var/log/messages, \
-    /bin/tail -f /var/log/*.log, \
-    /usr/bin/grep *, \
-    /bin/grep *
+    /usr/bin/grep, \
+    /bin/grep
 
 # --- Service Management (Status Only) ---
 # Purpose: Check service status, enablement
@@ -212,17 +182,16 @@ Cmnd_Alias SERVICE_STATUS = \
 # Risk: MEDIUM (reveals potential escalation paths but read-only)
 # Restrictions: Capability checks and configuration review only
 Cmnd_Alias SECURITY_AUDIT = \
-    /usr/sbin/getcap, \
     /usr/sbin/getcap -r /usr/bin, \
     /usr/sbin/getcap -r /usr/local/bin, \
     /usr/sbin/getcap -r /sbin, \
     /usr/sbin/getcap -r /usr/sbin, \
-    /usr/sbin/getcap -r *, \
-    /sbin/getcap *, \
     /bin/find /etc/sudoers.d -type f, \
     /usr/bin/find /etc/sudoers.d -type f, \
-    /bin/cat /etc/sudoers.d/*, \
-    /usr/bin/cat /etc/sudoers.d/*
+    /bin/cat /etc/sudoers.d/ai-auditor, \
+    /bin/cat /etc/sudoers.d/README, \
+    /usr/bin/cat /etc/sudoers.d/ai-auditor, \
+    /usr/bin/cat /etc/sudoers.d/README
 
 # ========================================
 # USER PERMISSION GRANTS - ai-auditor
