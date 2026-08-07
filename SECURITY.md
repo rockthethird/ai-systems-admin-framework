@@ -4,7 +4,7 @@
 
 **DO NOT** open public GitHub issues for security vulnerabilities.
 
-Instead, please report security issues by emailing [security@example.com](mailto:security@example.com) with:
+Instead, please report security issues by emailing security@[your-domain] with:
 
 1. Description of the vulnerability
 2. Steps to reproduce
@@ -36,4 +36,6 @@ Only the latest major version receives security updates.
 
 ## Contact
 
-Security team: [security@example.com](mailto:security@example.com)
+Security team: security@[your-domain]
+
+**Note:** Replace `[your-domain]` with your organization's domain before deploying.
