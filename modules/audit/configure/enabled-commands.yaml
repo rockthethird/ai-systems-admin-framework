@@ -1,0 +1,20 @@
+# AI Auditor Sudoers Commands Configuration
+#
+# This YAML file defines commands that the ai-auditor service account
+# can execute with sudo privileges on monitored systems.
+#
+# Format: Each command specifies:
+#   - name: Unique identifier (used in logs)
+#   - path: Absolute path to executable
+#   - args: Command-line arguments
+#   - description: Purpose for audit trail
+#
+# WARNING: Any commands added here will be executable by ai-auditor via sudo.
+# Only add commands that are safe for service execution. Manual testing required.
+#
+
+commands:
+  - name: "system-info"
+    path: "/usr/bin/uname"
+    args: "-a"
+    description: "Display system information (kernel, architecture, OS details)"

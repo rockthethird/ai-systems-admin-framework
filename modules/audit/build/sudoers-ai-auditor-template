@@ -57,15 +57,12 @@ Cmnd_Alias PHASE_1_COMMANDS = \
 # Allow ai-auditor to run Phase 1 commands without password
 ai-auditor ALL=(ALL) NOPASSWD: PHASE_1_COMMANDS
 
-# Fail-secure: Explicitly deny all other commands
-ai-auditor ALL=(ALL) DENY: ALL
-
 ################################################################################
 # Notes
 #
 # Phase 1 Architecture:
 # - Only /usr/bin/uname -a is permitted
-# - All other commands are blocked
+# - All other commands are blocked by default (sudo denies what's not allowed)
 # - Environment hardened (env_reset, secure_path, env_delete)
 # - All activity logged to /var/log/sudo-ai-auditor.log
 # - SSH key authentication only (password locked)

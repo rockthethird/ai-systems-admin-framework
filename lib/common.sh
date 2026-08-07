@@ -99,11 +99,6 @@ section_end() {
 #
 # Requires: Bash 4.3+ (nameref support)
 #
-# Example:
-#   parse_standard_flags_nameref -h -v -s value consumed
-#   shift $consumed
-#   # HELP_REQUESTED=true, VERBOSE=true, consumed=2
-
 parse_standard_flags_nameref() {
     # Extract the variable name (last argument)
     local var_name="${@: -1}"
@@ -432,7 +427,21 @@ require_confirmation() {
 }
 
 ################################################################################
-# Export functions for use in sourcing scripts
+# Load Optional Modules
+################################################################################
+
+# Source YAML parsing module if available
+if [ -f "$(dirname "${BASH_SOURCE[0]}")/yaml.sh" ]; then
+    source "$(dirname "${BASH_SOURCE[0]}")/yaml.sh"
+fi
+
+# Source sudoers generation module if available
+if [ -f "$(dirname "${BASH_SOURCE[0]}")/sudoers.sh" ]; then
+    source "$(dirname "${BASH_SOURCE[0]}")/sudoers.sh"
+fi
+
+################################################################################
+# Export Core Functions for use in sourcing scripts
 ################################################################################
 
 export -f log_info

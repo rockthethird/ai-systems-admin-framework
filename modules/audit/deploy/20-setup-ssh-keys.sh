@@ -67,10 +67,10 @@ if [ ! -f "$COMMON_LIB" ]; then
     echo ""
     echo "Proper usage on CONTROLLER:"
     echo "  cd /path/to/ai-systems-admin-framework"
-    echo "  bash modules/audit/scripts/setup/20-setup-ssh-keys.sh -s user@server"
+    echo "  bash modules/audit/deploy/20-setup-ssh-keys.sh -s user@server"
     echo ""
     echo "Copy ONLY scripts 10 and 30 to server:"
-    echo "  scp modules/audit/scripts/setup/{10-create-user.sh,30-configure-sudoers.sh,...} user@server:/tmp/"
+    echo "  scp modules/audit/deploy/{10-create-user.sh,30-configure-sudoers.sh,...} user@server:/tmp/"
     echo ""
     exit 1
 fi

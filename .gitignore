@@ -63,6 +63,9 @@ build/
 *.o
 *.so
 
+# Exception: Track build folders in modules/
+!modules/*/build/
+
 # Backup files
 *.bak
 *.backup

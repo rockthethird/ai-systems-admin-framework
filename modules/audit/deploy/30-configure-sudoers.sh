@@ -25,7 +25,7 @@ set -euo pipefail
 AI_AUDITOR_USER="ai-auditor"
 SUDOERS_DIR="/etc/sudoers.d"
 SUDOERS_FILE="$SUDOERS_DIR/$AI_AUDITOR_USER"
-SUDOERS_TEMPLATE="../../../../config/sudoers-ai-auditor-template"
+SUDOERS_TEMPLATE="../build/sudoers-ai-auditor-template"
 SUDOERS_BACKUP="$SUDOERS_FILE.backup.$(date +%Y%m%d-%H%M%S)"
 
 # Colors for output
@@ -84,7 +84,7 @@ PREREQUISITES
     - 10-create-user.sh must have run first
 
 DEPENDENCIES
-    - Requires config/sudoers-ai-auditor-template file (from repo root)
+    - Requires ../build/sudoers-ai-auditor-template file
     - Optional: visudo (for syntax validation; skip on minimal systems)
 
 EOF
