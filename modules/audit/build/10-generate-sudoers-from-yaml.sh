@@ -148,10 +148,9 @@ fi
 ################################################################################
 
 readonly YAML_CONFIG="$SCRIPT_DIR/modules/audit/configure/enabled-commands.yaml"
-readonly SUDOERS_TEMPLATE="$BUILD_DIR/sudoers-ai-auditor-template"
+readonly SUDOERS_GENERATED="$BUILD_DIR/sudoers-ai-auditor-generated"
 
 require_file "$YAML_CONFIG" "YAML command configuration" || exit 1
-require_file "$SUDOERS_TEMPLATE" "Sudoers template" || exit 1
 
 ################################################################################
 # Counters
@@ -167,7 +166,7 @@ section_header "Generate Sudoers from YAML"
 
 log_info "Step 1: Parse configuration"
 log_info "  YAML config: $YAML_CONFIG"
-log_info "  Template: $SUDOERS_TEMPLATE"
+log_info "  Output: $SUDOERS_GENERATED"
 
 # Parse commands
 commands_array=()
@@ -185,7 +184,7 @@ log_info "Step 2: Generate sudoers file"
 TEMP_SUDOERS=$(mktemp)
 trap "rm -f $TEMP_SUDOERS" EXIT
 
-if generate_sudoers_from_yaml "$YAML_CONFIG" "$SUDOERS_TEMPLATE" > "$TEMP_SUDOERS" 2>/dev/null; then
+if generate_sudoers_from_yaml "$YAML_CONFIG" > "$TEMP_SUDOERS" 2>/dev/null; then
     log_success "Sudoers file generated"
 else
     log_error "Failed to generate sudoers file"
@@ -232,16 +231,25 @@ echo ""
 
 section_header "Generated Sudoers File"
 
+# If output file specified, write only there (skip generated)
 if [ -n "$OUTPUT_FILE" ]; then
     cp "$TEMP_SUDOERS" "$OUTPUT_FILE"
     log_success "Sudoers written to: $OUTPUT_FILE"
-    log_info "File size: $(wc -c < "$OUTPUT_FILE") bytes"
-    log_info "File permissions: $(stat -c '%a' "$OUTPUT_FILE")"
-    echo ""
     log_info "Preview (first 20 lines):"
     head -20 "$OUTPUT_FILE" | sed 's/^/  /'
 else
-    cat "$TEMP_SUDOERS"
+    # No output file: backup and update generated
+    if [ -f "$SUDOERS_GENERATED" ]; then
+        cp "$SUDOERS_GENERATED" "$SUDOERS_GENERATED.backup.$(date +%Y%m%d-%H%M%S)"
+        log_info "Backed up previous version: sudoers-ai-auditor-generated.backup.*"
+    fi
+    
+    cp "$TEMP_SUDOERS" "$SUDOERS_GENERATED"
+    log_success "Sudoers generated: $SUDOERS_GENERATED"
+    log_info "Ready for deployment via: deploy/30-configure-sudoers.sh"
+    echo ""
+    log_info "Preview (first 20 lines):"
+    head -20 "$SUDOERS_GENERATED" | sed 's/^/  /'
 fi
 
 ################################################################################
@@ -254,19 +262,23 @@ log_success "Generation complete"
 log_warn "IMPORTANT: Review the generated sudoers above carefully!"
 log_warn "No automatic command execution or verification was performed."
 log_info ""
-log_info "Next steps:"
-log_info "  1. CAREFULLY review the generated sudoers above"
-log_info "  2. Verify all commands and arguments are correct"
-log_info "  3. Check for any unintended or dangerous commands"
-log_info "  4. Copy to server via secure channel"
-log_info "  5. On SERVER: sudo bash deploy/30-configure-sudoers.sh"
-log_info "  6. On SERVER: Manually test each command"
-log_info ""
 
 if [ -n "$OUTPUT_FILE" ]; then
-    log_info "To deploy saved file:"
-    log_info "  scp $OUTPUT_FILE user@server:/tmp/sudoers-new"
-    log_info "  ssh user@server sudo bash deploy/30-configure-sudoers.sh"
+    log_info "Sudoers written to custom file: $OUTPUT_FILE"
+    log_info "Next steps:"
+    log_info "  1. CAREFULLY review the sudoers file"
+    log_info "  2. Transfer to server: scp $OUTPUT_FILE user@server:/tmp/"
+    log_info "  3. On SERVER: sudo bash deploy/30-configure-sudoers.sh -f /tmp/$(basename $OUTPUT_FILE)"
+    log_info "  4. On SERVER: Manually test each command"
+else
+    log_info "Sudoers generated and ready to deploy"
+    log_info "Next steps:"
+    log_info "  1. CAREFULLY review the generated sudoers above"
+    log_info "  2. Verify all commands and arguments are correct"
+    log_info "  3. Check for any unintended or dangerous commands"
+    log_info "  4. On SERVER: sudo bash deploy/30-configure-sudoers.sh"
+    log_info "     (Automatically uses: sudoers-ai-auditor-generated)"
+    log_info "  5. On SERVER: Manually test each command"
 fi
 
 log_info ""

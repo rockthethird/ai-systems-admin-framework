@@ -27,21 +27,18 @@
 #
 # Parameters:
 #   $1: Path to YAML config file
-#   $2: Path to sudoers template file
 #
 # Returns: 0 on success, 1 on error
 #
 # The function:
 #   1. Reads commands from YAML
 #   2. Generates sudoers rules with audit trail
-#   3. Appends security epilogue from template
+#   3. Appends hardened security configuration
 #
 generate_sudoers_from_yaml() {
     local yaml_file=$1
-    local template_file=$2
     
     require_file "$yaml_file" || return 1
-    require_file "$template_file" || return 1
     
     local timestamp=$(date -u +'%Y-%m-%d %H:%M:%S UTC')
     
@@ -88,12 +85,36 @@ EOF
         echo "$rule"
     done
     
-    # Append the template epilogue (security rules)
-    echo ""
-    if [ -f "$template_file" ]; then
-        # Extract and append security footer from template (DENY rules, etc.)
-        grep -A 999 "DENY:" "$template_file" 2>/dev/null || true
-    fi
+    # Append security hardening footer
+    cat << 'EOF'
+
+################################################################################
+# Environment Hardening
+################################################################################
+
+# Reset environment to secure defaults
+Defaults:ai-auditor env_reset
+
+# Restrict PATH to known-safe locations
+Defaults:ai-auditor secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Explicitly block dangerous environment variables
+Defaults:ai-auditor env_delete="LD_PRELOAD LD_LIBRARY_PATH PYTHONPATH PATH_ORIG LD_AUDIT LD_DEBUG"
+
+# Preserve only locale-related variables (safe to keep)
+Defaults:ai-auditor env_keep="LANGUAGE LANG LC_*"
+
+################################################################################
+# Logging Configuration
+################################################################################
+
+# Log all ai-auditor sudo commands to file
+Defaults:ai-auditor logfile="/var/log/sudo-ai-auditor.log"
+
+# Require no terminal (for SSH automation)
+Defaults:ai-auditor !requiretty
+
+EOF
     
     return 0
 }

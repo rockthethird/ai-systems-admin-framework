@@ -1,0 +1,37 @@
+# This file is auto-generated - DO NOT EDIT DIRECTLY
+# Generated at: 2026-08-09 23:58:00 UTC
+# Modify the YAML config and regenerate to update
+#
+
+ai-auditor ALL=(ALL) NOPASSWD: /usr/bin/uname -a  # Display system information (kernel, architecture, OS details)
+ai-auditor ALL=(ALL) NOPASSWD: /usr/sbin/sshd -T  # Inspect effective SSH daemon configuration
+ai-auditor ALL=(ALL) NOPASSWD: /usr/bin/stat -c %a %U %G %n /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf  # Check SSH config file permissions and ownership
+ai-auditor ALL=(ALL) NOPASSWD: /usr/bin/cat /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf  # Read SSH daemon configuration files
+ai-auditor ALL=(ALL) NOPASSWD: /usr/bin/grep -E -H -e PasswordAuthentication -e PermitRootLogin -e PubkeyAuthentication /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf  # Check SSH authentication methods configuration
+
+################################################################################
+# Environment Hardening
+################################################################################
+
+# Reset environment to secure defaults
+Defaults:ai-auditor env_reset
+
+# Restrict PATH to known-safe locations
+Defaults:ai-auditor secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Explicitly block dangerous environment variables
+Defaults:ai-auditor env_delete="LD_PRELOAD LD_LIBRARY_PATH PYTHONPATH PATH_ORIG LD_AUDIT LD_DEBUG"
+
+# Preserve only locale-related variables (safe to keep)
+Defaults:ai-auditor env_keep="LANGUAGE LANG LC_*"
+
+################################################################################
+# Logging Configuration
+################################################################################
+
+# Log all ai-auditor sudo commands to file
+Defaults:ai-auditor logfile="/var/log/sudo-ai-auditor.log"
+
+# Require no terminal (for SSH automation)
+Defaults:ai-auditor !requiretty
+

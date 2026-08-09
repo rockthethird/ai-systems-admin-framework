@@ -25,8 +25,9 @@ set -euo pipefail
 AI_AUDITOR_USER="ai-auditor"
 SUDOERS_DIR="/etc/sudoers.d"
 SUDOERS_FILE="$SUDOERS_DIR/$AI_AUDITOR_USER"
-SUDOERS_TEMPLATE="../build/sudoers-ai-auditor-template"
+SUDOERS_DEFAULT="../build/sudoers-ai-auditor-generated"
 SUDOERS_BACKUP="$SUDOERS_FILE.backup.$(date +%Y%m%d-%H%M%S)"
+SUDOERS_SOURCE=""  # Set by parameter parsing or default
 
 # Colors for output
 RED='\033[0;31m'
@@ -61,31 +62,36 @@ show_help() {
 Phase 1: Configure Sudoers
 
 SYNOPSIS
-    sudo bash ./30-configure-sudoers.sh [-v|--verbose] [-h|--help]
+    sudo bash ./30-configure-sudoers.sh [-f FILE] [-v|--verbose] [-h|--help]
 
 OPTIONS
+    -f, --file FILE File to deploy (default: build/sudoers-ai-auditor-generated)
     -v, --verbose   Display detailed output for debugging
     -h, --help      Display this help message
 
 EXAMPLES
     sudo bash ./30-configure-sudoers.sh
-    sudo bash ./30-configure-sudoers.sh --verbose
+    sudo bash ./30-configure-sudoers.sh --file /tmp/sudoers-custom
+    sudo bash ./30-configure-sudoers.sh -f ../build/sudoers-ai-auditor-generated -v
 
 DESCRIPTION
-    Deploys Phase 1 sudoers configuration for ai-auditor with:
-    - Single command: /usr/bin/uname -a
+    Deploys sudoers configuration for ai-auditor with:
     - Environment: env_reset with explicit safe variables
     - Security: SSH-only (!requiretty), no password (NOPASSWD), secure_path
     - Logging: All commands logged to /var/log/sudo-ai-auditor.log
-    - Fail-secure: Explicit DENY: ALL at end
+
+    By default uses:
+    - Generated sudoers: build/sudoers-ai-auditor-generated (from build script)
 
 PREREQUISITES
     - Must run with sudo or as root
     - 10-create-user.sh must have run first
 
-DEPENDENCIES
-    - Requires ../build/sudoers-ai-auditor-template file
-    - Optional: visudo (for syntax validation; skip on minimal systems)
+WORKFLOW
+    1. Generate artifact: bash ../build/10-generate-sudoers-from-yaml.sh
+    2. Deploy generated: sudo bash ./30-configure-sudoers.sh
+    3. Or deploy custom: sudo bash ./30-configure-sudoers.sh -f /custom/sudoers
+    4. Verify: sudo -l -U ai-auditor
 
 EOF
 }
@@ -96,6 +102,10 @@ parse_parameters() {
             -h|--help)
                 show_help
                 exit 0
+                ;;
+            -f|--file)
+                SUDOERS_SOURCE="$2"
+                shift 2
                 ;;
             -v|--verbose)
                 VERBOSE=true
@@ -138,15 +148,6 @@ verify_prerequisites() {
     
     log_info "✓ User '$AI_AUDITOR_USER' exists"
     
-    # Check if sudoers template exists
-    if [ ! -f "$SUDOERS_TEMPLATE" ]; then
-        log_error "Sudoers template not found: $SUDOERS_TEMPLATE"
-        log_error "Must be in same directory as this script"
-        return 1
-    fi
-    
-    log_info "✓ Sudoers template found"
-    
     # Check if sudoers.d directory exists
     if [ ! -d "$SUDOERS_DIR" ]; then
         log_error "Sudoers.d directory not found: $SUDOERS_DIR"
@@ -178,9 +179,31 @@ backup_existing_sudoers() {
 deploy_sudoers() {
     log_info "Step 3: Deploying sudoers configuration"
     
-    # Copy template to sudoers.d
-    cp "$SUDOERS_TEMPLATE" "$SUDOERS_FILE"
+    # Use specified file, default, or fallback
+    local sudoers_file=""
     
+    if [ -n "$SUDOERS_SOURCE" ]; then
+        # User specified with -f flag
+        sudoers_file="$SUDOERS_SOURCE"
+        log_info "Using specified sudoers file: $sudoers_file"
+    elif [ -f "$SUDOERS_DEFAULT" ]; then
+        # Use generated sudoers
+        sudoers_file="$SUDOERS_DEFAULT"
+        log_info "Using generated sudoers: $sudoers_file"
+    else
+        log_error "No sudoers file found:"
+        log_error "  Generated: $SUDOERS_DEFAULT"
+        log_error "Run build script first: bash ../build/10-generate-sudoers-from-yaml.sh"
+        return 1
+    fi
+    
+    # Verify file exists
+    if [ ! -f "$sudoers_file" ]; then
+        log_error "Sudoers file not found: $sudoers_file"
+        return 1
+    fi
+    
+    cp "$sudoers_file" "$SUDOERS_FILE"
     log_info "✓ Sudoers file deployed to $SUDOERS_FILE"
 }
 
