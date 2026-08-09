@@ -45,7 +45,7 @@ set -euo pipefail
 
 # Get script directory and source common.sh from repo root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMMON_LIB="$SCRIPT_DIR/../../../../lib/common.sh"
+COMMON_LIB="$SCRIPT_DIR/../../../lib/common.sh"
 
 if [ ! -f "$COMMON_LIB" ]; then
     echo "ERROR: common.sh not found at: $COMMON_LIB"
