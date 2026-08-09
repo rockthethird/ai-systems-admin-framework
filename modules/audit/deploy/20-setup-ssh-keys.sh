@@ -299,23 +299,16 @@ deploy_public_key() {
     # Read public key
     local pubkey_content=$(cat "$PUBLIC_KEY_PATH")
     
-    # Check if this key already on server (use sudo for permission)
-    if ssh "$SERVER_ADDRESS" "sudo grep -q '$(cat "$PUBLIC_KEY_PATH")' /opt/$AI_AUDITOR_USER/.ssh/authorized_keys 2>/dev/null" 2>/dev/null; then
-        log_warn "Public key already deployed to server, skipping"
-        return 0
-    fi
-    
-    # Deploy public key via SSH (using sudo and tee for permission handling)
-    echo "$pubkey_content" | ssh "$SERVER_ADDRESS" "sudo tee -a /opt/$AI_AUDITOR_USER/.ssh/authorized_keys > /dev/null && sudo chown $AI_AUDITOR_USER:$AI_AUDITOR_USER /opt/$AI_AUDITOR_USER/.ssh/authorized_keys && sudo chmod 600 /opt/$AI_AUDITOR_USER/.ssh/authorized_keys"
-    
-    # Verify deployment (use sudo for permission)
-    if ssh "$SERVER_ADDRESS" "sudo grep -q '$(cat "$PUBLIC_KEY_PATH")' /opt/$AI_AUDITOR_USER/.ssh/authorized_keys" 2>/dev/null; then
-        log_info "✓ Public key deployed to server"
-        log_info "  Location: /opt/$AI_AUDITOR_USER/.ssh/authorized_keys"
+    # Deploy public key using ssh-copy-id (handles .ssh directory and permissions)
+    # First, add to rock's .ssh/authorized_keys to establish trust
+    if ssh-copy-id -i "$PUBLIC_KEY_PATH" "$SERVER_ADDRESS" > /dev/null 2>&1; then
+        log_info "✓ Public key deployed successfully"
+        log_info "  Location: ~/.ssh/authorized_keys on $SERVER_ADDRESS"
         log_info "  Controller: $CONTROLLER_MACHINE"
         log_info "  Comment: $KEY_COMMENT"
     else
-        log_error "Failed to deploy public key to server"
+        log_error "Failed to deploy public key"
+        log_error "Ensure SSH access is available and password authentication works"
         return 1
     fi
 }
@@ -337,17 +330,17 @@ verify_deployment() {
         log_info "✓ Private key exists on controller"
     fi
     
-    # Check public key exists on server (use sudo for permission)
-    if ! ssh "$SERVER_ADDRESS" "sudo grep -q '$KEY_COMMENT' /opt/$AI_AUDITOR_USER/.ssh/authorized_keys" 2>/dev/null; then
+    # Check public key exists on server
+    if ! ssh "$SERVER_ADDRESS" "grep -q '$KEY_COMMENT' ~/.ssh/authorized_keys" 2>/dev/null; then
         log_error "Public key not found on server"
         ((errors++))
     else
         log_info "✓ Public key deployed to server with correct identifier"
     fi
     
-    # List all authorized keys on server (use sudo for permission)
+    # List all authorized keys on server
     log_info "Authorized keys on server:"
-    ssh "$SERVER_ADDRESS" "sudo grep @ /opt/$AI_AUDITOR_USER/.ssh/authorized_keys 2>/dev/null | sed 's/^/  - /'" || log_info "  (none found)"
+    ssh "$SERVER_ADDRESS" "grep @ ~/.ssh/authorized_keys 2>/dev/null | sed 's/^/  - /'" || log_info "  (none found)"
     
     return $errors
 }
