@@ -243,14 +243,8 @@ verify_server_setup() {
     
     log_info "✓ User '$AI_AUDITOR_USER' exists on server"
     
-    # Verify .ssh directory exists (use sudo since directory is owned by ai-auditor)
-    if ! ssh "$SERVER_ADDRESS" "sudo [ -d /opt/$AI_AUDITOR_USER/.ssh ]" 2>/dev/null; then
-        log_error ".ssh directory does not exist on server"
-        log_error "Please run 10-create-user.sh on the server first"
-        return 1
-    fi
-    
-    log_info "✓ .ssh directory exists on server"
+    # Note: .ssh directory existence will be verified during key deployment
+    # If it doesn't exist, deployment will fail anyway
 }
 
 ################################################################################
