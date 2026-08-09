@@ -18,3 +18,23 @@ commands:
     path: "/usr/bin/uname"
     args: "-a"
     description: "Display system information (kernel, architecture, OS details)"
+
+  - name: "ssh-inspect-sshd-effective"
+    path: "/usr/sbin/sshd"
+    args: "-T"
+    description: "Inspect effective SSH daemon configuration"
+
+  - name: "ssh-inspect-stat"
+    path: "/usr/bin/stat"
+    args: "-c '%a %U %G %n' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf"
+    description: "Check SSH config file permissions and ownership"
+
+  - name: "ssh-inspect-cat"
+    path: "/usr/bin/cat"
+    args: "/etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf"
+    description: "Read SSH daemon configuration files"
+
+  - name: "ssh-inspect-auth-methods"
+    path: "/usr/bin/grep"
+    args: "-E -H 'PasswordAuthentication|PermitRootLogin|PubkeyAuthentication' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf"
+    description: "Check SSH authentication methods configuration"
