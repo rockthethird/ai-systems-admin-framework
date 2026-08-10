@@ -18,6 +18,8 @@ This is an inventory and evidence-collection layer. Finding generation, adaptive
 
 The collector is privileged code. Its output can contain sensitive host, account, network, package, and container metadata. Docker daemon access is optional and must be reviewed separately. See [THREAT-MODEL.md](docs/THREAT-MODEL.md).
 
+The fixed child-command review and current trace limitations are recorded in [COLLECTOR-COMMAND-REVIEW.md](docs/COLLECTOR-COMMAND-REVIEW.md).
+
 ## Build, deploy, and test
 
 ```bash

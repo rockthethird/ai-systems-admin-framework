@@ -25,7 +25,7 @@ The AI is not trusted as a system administrator. It may analyze broad evidence, 
   - Resolves its artifact path independently of the caller's working directory.
   - Requires `visudo`, installs a root-owned temporary candidate, validates it before activation, and verifies content, ownership, mode, and syntax.
 - `modules/audit/tests/`
-  - Covers schema, missing and relative commands, timeout behavior, byte truncation, and argument rejection.
+  - Covers schema, missing and relative commands, timeout behavior, byte truncation, argument rejection, resource ceilings, and the pinned interpreter.
 - Documentation now labels the module alpha, distinguishes implemented tests from historical proposals, and includes `modules/audit/docs/THREAT-MODEL.md`.
 
 ## Validation completed
@@ -55,10 +55,9 @@ The live Hermes gateway was queried through its configured free model using only
 ## Known limitations and next work
 
 1. Repeat end-to-end deployment on the actual target VM and additional supported distributions.
-2. Investigate OS-level CPU, address-space, process, and file-descriptor limits for collector children without breaking legitimate inspection tools.
-3. Audit fixed child commands for side effects and configuration-file influence, ideally with `strace` on a disposable target.
-4. Define a versioned findings/report schema that consumes inventory without additional privilege.
-5. Add narrow drill-down collectors only when real audit evidence demonstrates a need.
-6. Add centralized, tamper-resistant logging before making complete-auditability claims.
+2. Repeat the fixed-command syscall trace on the target VM, including its real systemd and optional Docker paths.
+3. Define a versioned findings/report schema that consumes inventory without additional privilege.
+4. Add narrow drill-down collectors only when real audit evidence demonstrates a need.
+5. Add centralized, tamper-resistant logging before making complete-auditability claims.
 
 The patch archive `ai-auditor-changes-2026-08-10.patch` predates these changes and must not be applied over the current tree.
