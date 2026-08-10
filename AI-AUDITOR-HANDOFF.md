@@ -29,6 +29,8 @@ The AI is not trusted as a system administrator. It may analyze broad evidence, 
 - Documentation now labels the module alpha, distinguishes implemented tests from historical proposals, and includes `modules/audit/docs/THREAT-MODEL.md`.
 - `modules/audit/reporting/` defines the unprivileged `ai-auditor-findings/v1` report contract, provenance, evidence pointers, confidence, sensitivity, and lifecycle fields.
 - `modules/audit/reporting/analyze-inventory.py` provides an initial deterministic, unprivileged analysis pass for capacity, failed services, UID 0 identities, and evidence completeness.
+- `modules/audit/reporting/sanitize-findings.py` produces a fail-closed `external-safe/v1` view for Hermes. It withholds host identifiers, timestamps, raw evidence, and JSON pointers while retaining controlled rule text, severity, confidence, hashes, evidence counts, and completeness.
+- `modules/audit/reporting/prepare-external-report.sh` runs local analysis followed by sanitization so raw inventory and evidence-rich findings do not enter the normal model-facing workflow.
 
 ## Validation completed
 
@@ -53,6 +55,8 @@ The host VM has an existing `ai-auditor` account and `visudo`, but host deployme
 ## Hermes review
 
 The live Hermes gateway was queried through its configured free model using only a generic architecture description; private repository contents were not sent to the external Nous Portal. Its review helped identify the need for explicit no-argument sudoers matching and defense-in-depth argument rejection. It also recommended future resource-limit and syscall-level testing.
+
+Hermes currently runs on the audited host with direct Docker and SSH paths only for framework development and testing. That topology can bypass a sanitization wrapper and must not be treated as the intended production boundary. When Hermes is given access to other servers, those targets should expose only framework-defined collection, analysis, sanitization, and approved drill-down capabilities.
 
 ## Known limitations and next work
 

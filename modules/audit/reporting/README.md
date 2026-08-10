@@ -1,6 +1,11 @@
 # Findings Reporting
 
-This directory defines the unprivileged output boundary between inventory analysis and human review. Producing a findings report does not grant execution or remediation authority.
+This directory defines two unprivileged output boundaries:
+
+1. `ai-auditor-findings/v1` preserves evidence for local human review.
+2. `ai-auditor-external-findings/v1` minimizes disclosure before findings enter an externally hosted model workflow such as Hermes.
+
+Producing either report grants no execution or remediation authority.
 
 Version 1 records:
 
@@ -14,11 +19,33 @@ Version 1 records:
 
 Reports should point to the minimum evidence needed to support a finding. Do not copy secrets or unrelated raw inventory into `observation`. A recommendation is text for human review, not an executable command request.
 
+## External-safe profile
+
+Raw inventory and full findings remain local. Generate the model-facing document with:
+
+```bash
+modules/audit/reporting/prepare-external-report.sh inventory.json > external-findings.json
+```
+
+The wrapper analyzes the raw inventory locally, stores its intermediate findings in a mode-restricted temporary file, and emits only the `external-safe/v1` view. Do not give raw inventory or full findings to Hermes before running this step.
+
+The external-safe sanitizer:
+
+- accepts only reports from `ai-auditor-static-rules/v1`,
+- reconstructs public text for known rule IDs rather than copying arbitrary report strings,
+- rejects unknown rules, altered public text, duplicate IDs, and inconsistent summaries,
+- withholds host identity, collection timestamps, evidence paths, and evidence observations,
+- retains content hashes, severity totals, confidence, controlled evidence sections, and withheld-item counts,
+- marks evidence quality degraded when the analyzer reports incomplete collection.
+
+This is a default data-minimization guardrail. It becomes a hard confidentiality boundary only when Hermes cannot bypass it through unrestricted SSH, Docker, filesystem, or other host access.
+
 Validate the schema and example with:
 
 ```bash
 bash modules/audit/tests/test-findings-schema.sh
 bash modules/audit/tests/test-inventory-analysis.sh
+bash modules/audit/tests/test-external-findings-sanitization.sh
 ```
 
 Generate an initial deterministic report without elevated privileges:
@@ -27,4 +54,4 @@ Generate an initial deterministic report without elevated privileges:
 modules/audit/reporting/analyze-inventory.py inventory.json --output findings.json
 ```
 
-The initial static rules flag filesystems at or above 90% utilization, failed systemd units, additional UID 0 accounts, and incomplete collection evidence. Rule IDs are stable. The analyzer performs no subprocess or network operations.
+The initial static rules flag filesystems at or above 90% utilization, failed systemd units, additional UID 0 accounts, and incomplete collection evidence. Rule IDs are stable. The analyzer and sanitizer perform no subprocess or network operations; the shell wrapper invokes only those two pinned local programs.

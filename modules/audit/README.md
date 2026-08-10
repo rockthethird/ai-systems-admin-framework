@@ -6,7 +6,7 @@ Experimental, least-privilege host inventory for AI-assisted auditing.
 
 The module creates an `ai-auditor` service account and grants it one privileged operation: execute `/usr/local/libexec/ai-auditor-inventory` with no arguments. The collector emits bounded JSON describing host identity, filesystems, networking, systemd, accounts, packages, scheduled-task locations, and—when the Docker client and daemon access are available—container metadata.
 
-This is an inventory and evidence-collection layer. Finding generation, adaptive drill-down, reporting, and remediation are not implemented yet. The module is alpha software and is not production-ready.
+This is an inventory, deterministic findings, and external-safe reporting prototype. Adaptive drill-down and remediation are not implemented. The module is alpha software and is not production-ready.
 
 ## Security model
 
@@ -29,6 +29,7 @@ bash modules/audit/tests/test-inventory-collector.sh
 bash modules/audit/tests/test-sudoers-generation.sh
 bash modules/audit/tests/test-findings-schema.sh
 bash modules/audit/tests/test-inventory-analysis.sh
+bash modules/audit/tests/test-external-findings-sanitization.sh
 
 # On a disposable target, from the repository root
 sudo bash modules/audit/deploy/10-create-user.sh
@@ -45,8 +46,9 @@ SSH key setup and SSH hardening are separate steps; see [deploy/README.md](deplo
 ## Next milestones
 
 1. Repeat end-to-end deployment and denial testing on supported Linux distributions.
-2. Expand the unprivileged analysis rules from evidence gathered in real audits.
-3. Add drill-down collectors only when real audits identify missing evidence.
-4. Add centralized, tamper-resistant logging before making stronger auditability claims.
+2. Integrate the external-safe report wrapper with Hermes without exposing raw inventory.
+3. Expand the unprivileged analysis rules from evidence gathered in real audits.
+4. Add drill-down collectors only when real audits identify missing evidence.
+5. Add centralized, tamper-resistant logging before making stronger auditability claims.
 
-The initial unprivileged report contract is documented in [reporting/README.md](reporting/README.md).
+The local and external-safe report contracts are documented in [reporting/README.md](reporting/README.md).
