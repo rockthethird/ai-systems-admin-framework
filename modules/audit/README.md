@@ -4,7 +4,7 @@ Experimental, least-privilege host inventory for AI-assisted auditing.
 
 ## Current capability
 
-The module creates an `ai-auditor` service account and grants it one privileged operation: execute `/usr/local/libexec/ai-auditor-report` with no arguments. That endpoint collects bounded raw evidence through root-only helpers, analyzes it locally, and returns only `ai-auditor-external-findings/v1`. The service account cannot execute or sudo the raw inventory collector.
+The module creates separate locked `ai-auditor-cloud` and `ai-auditor-local` identities. Cloud can execute only the no-argument external-safe endpoint; local can execute only the no-argument internal-rich endpoint. Both collect bounded evidence through root-only helpers, and neither identity can execute or sudo the raw collector.
 
 This is an inventory, deterministic findings, and external-safe reporting prototype. Adaptive drill-down and remediation are not implemented. The module is alpha software and is not production-ready.
 
@@ -30,16 +30,17 @@ bash modules/audit/tests/test-sudoers-generation.sh
 bash modules/audit/tests/test-findings-schema.sh
 bash modules/audit/tests/test-inventory-analysis.sh
 bash modules/audit/tests/test-external-findings-sanitization.sh
+bash modules/audit/tests/test-internal-findings-sanitization.sh
 
 # On a disposable target, from the repository root
-sudo bash modules/audit/deploy/10-create-user.sh
+sudo bash modules/audit/deploy/12-create-report-identities.sh
 sudo bash modules/audit/deploy/15-deploy-inventory-collector.sh
 sudo bash modules/audit/deploy/30-configure-sudoers.sh
 
 # Positive and negative authorization checks
-sudo -u ai-auditor sudo -n /usr/local/libexec/ai-auditor-report
-sudo -u ai-auditor sudo -n /usr/local/libexec/ai-auditor-inventory  # must be denied
-sudo -u ai-auditor sudo -n /bin/sh -c id   # must be denied
+sudo -u ai-auditor-cloud sudo -n /usr/local/libexec/ai-auditor-report
+sudo -u ai-auditor-local sudo -n /usr/local/libexec/ai-auditor-report-internal
+sudo -u ai-auditor-cloud sudo -n /usr/local/libexec/ai-auditor-inventory  # must be denied
 ```
 
 SSH key setup and SSH hardening are separate steps; see [deploy/README.md](deploy/README.md). Test on a snapshot or disposable host before wider use.

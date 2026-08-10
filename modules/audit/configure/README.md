@@ -30,6 +30,7 @@ vi enabled-commands.yaml
 ```yaml
 commands:
   - name: "system-info"
+    user: "ai-auditor-local"
     path: "/usr/bin/uname"
     args: "-a"
     description: "Display system information"
@@ -40,6 +41,7 @@ commands:
 | Field | Purpose | Example |
 |-------|---------|---------|
 | `name` | Unique identifier (used in logs) | `system-info` |
+| `user` | Service identity receiving the exact capability | `ai-auditor-local` |
 | `path` | Absolute path to executable | `/usr/bin/uname` |
 | `args` | Command-line arguments | `-a` |
 | `description` | Purpose for audit trail | `Display system information` |

@@ -32,6 +32,8 @@ The AI is not trusted as a system administrator. It may analyze broad evidence, 
 - `modules/audit/reporting/sanitize-findings.py` produces a fail-closed `external-safe/v1` view for Hermes. It withholds host identifiers, timestamps, raw evidence, and JSON pointers while retaining controlled rule text, severity, confidence, hashes, evidence counts, and completeness.
 - `modules/audit/reporting/prepare-external-report.sh` runs local analysis followed by sanitization so raw inventory and evidence-rich findings do not enter the normal model-facing workflow.
 - `modules/audit/reporting/ai-auditor-report.sh` is the installed AI-facing endpoint. It creates root-only temporary evidence, calls the private collector/analyzer/sanitizer chain, emits only external-safe JSON, and removes intermediate artifacts on exit.
+- `modules/audit/reporting/ai-auditor-report-internal.sh` emits `internal-rich/v1` for a local model, including exact host identity and constrained finding-relevant evidence labeled as untrusted.
+- `modules/audit/deploy/12-create-report-identities.sh` creates locked `ai-auditor-cloud` and `ai-auditor-local` identities without installing SSH keys. Sudo binds each identity to only its matching fixed endpoint; SSH binding is deliberately deferred for design review.
 
 ## Validation completed
 

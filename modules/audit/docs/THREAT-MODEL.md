@@ -17,6 +17,8 @@ Docker is a separate boundary. Membership in the Docker socket group or unrestri
 
 Externally hosted model inference is another boundary. Raw inventory and local findings do not cross it by default. The `external-safe/v1` sanitizer emits a minimized, fail-closed view containing only known deterministic rule text, summary data, hashes, and evidence counts/categories. Host identifiers, timestamps, evidence paths, and observations remain local.
 
+The `internal-rich/v1` profile is intended for a locally hosted model. It includes exact host identity and constrained finding-relevant details, all explicitly labeled as untrusted host evidence. It still excludes raw inventory, arbitrary evidence strings, logs, configuration contents, and unrelated inventory. Separate locked identities bind cloud and local consumers to their respective fixed endpoints; SSH credential binding remains intentionally undecided.
+
 The current Hermes-on-audited-host arrangement is a temporary test topology. Its host Docker access and unprivileged shell visibility can bypass portions of the sanitizer, so external-safe output is not a complete confidentiality boundary in that environment. Future remote targets are expected to be reachable only through the sanitized report endpoint and later approved drill-down interfaces.
 
 ## Enforced controls
