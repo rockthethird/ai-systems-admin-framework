@@ -28,6 +28,7 @@ The AI is not trusted as a system administrator. It may analyze broad evidence, 
   - Covers schema, missing and relative commands, timeout behavior, byte truncation, argument rejection, resource ceilings, and the pinned interpreter.
 - Documentation now labels the module alpha, distinguishes implemented tests from historical proposals, and includes `modules/audit/docs/THREAT-MODEL.md`.
 - `modules/audit/reporting/` defines the unprivileged `ai-auditor-findings/v1` report contract, provenance, evidence pointers, confidence, sensitivity, and lifecycle fields.
+- `modules/audit/reporting/analyze-inventory.py` provides an initial deterministic, unprivileged analysis pass for capacity, failed services, UID 0 identities, and evidence completeness.
 
 ## Validation completed
 
@@ -57,7 +58,7 @@ The live Hermes gateway was queried through its configured free model using only
 
 1. Repeat end-to-end deployment on the actual target VM and additional supported distributions.
 2. Repeat the fixed-command syscall trace on the target VM, including its real systemd and optional Docker paths.
-3. Implement an unprivileged analysis pass that emits the versioned findings schema.
+3. Expand unprivileged analysis rules only from conditions observed in real audit evidence.
 4. Add narrow drill-down collectors only when real audit evidence demonstrates a need.
 5. Add centralized, tamper-resistant logging before making complete-auditability claims.
 

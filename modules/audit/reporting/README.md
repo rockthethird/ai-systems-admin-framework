@@ -18,4 +18,13 @@ Validate the schema and example with:
 
 ```bash
 bash modules/audit/tests/test-findings-schema.sh
+bash modules/audit/tests/test-inventory-analysis.sh
 ```
+
+Generate an initial deterministic report without elevated privileges:
+
+```bash
+modules/audit/reporting/analyze-inventory.py inventory.json --output findings.json
+```
+
+The initial static rules flag filesystems at or above 90% utilization, failed systemd units, additional UID 0 accounts, and incomplete collection evidence. Rule IDs are stable. The analyzer performs no subprocess or network operations.

@@ -28,6 +28,7 @@ bash modules/audit/build/10-generate-sudoers-from-yaml.sh
 bash modules/audit/tests/test-inventory-collector.sh
 bash modules/audit/tests/test-sudoers-generation.sh
 bash modules/audit/tests/test-findings-schema.sh
+bash modules/audit/tests/test-inventory-analysis.sh
 
 # On a disposable target, from the repository root
 sudo bash modules/audit/deploy/10-create-user.sh
@@ -44,7 +45,7 @@ SSH key setup and SSH hardening are separate steps; see [deploy/README.md](deplo
 ## Next milestones
 
 1. Repeat end-to-end deployment and denial testing on supported Linux distributions.
-2. Implement an unprivileged analysis pass that emits the versioned findings schema.
+2. Expand the unprivileged analysis rules from evidence gathered in real audits.
 3. Add drill-down collectors only when real audits identify missing evidence.
 4. Add centralized, tamper-resistant logging before making stronger auditability claims.
 
