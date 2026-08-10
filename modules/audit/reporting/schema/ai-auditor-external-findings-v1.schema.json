@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/rockthethird/ai-systems-admin-framework/blob/master/modules/audit/reporting/schema/ai-auditor-external-findings-v1.schema.json",
+  "title": "AI Auditor External Findings v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profile", "source", "disclosure", "evidence_quality", "analysis", "summary", "findings"],
+  "properties": {
+    "schema_version": {"const": "ai-auditor-external-findings/v1"},
+    "profile": {"const": "external-safe/v1"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_schema_version", "inventory_sha256", "findings_sha256"],
+      "properties": {
+        "input_schema_version": {"const": "ai-auditor-findings/v1"},
+        "inventory_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "findings_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
+    "disclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw_inventory_included", "host_identifiers_included", "collection_timestamps_included", "evidence_paths_included", "evidence_observations_included", "withheld_evidence_items"],
+      "properties": {
+        "raw_inventory_included": {"const": false},
+        "host_identifiers_included": {"const": false},
+        "collection_timestamps_included": {"const": false},
+        "evidence_paths_included": {"const": false},
+        "evidence_observations_included": {"const": false},
+        "withheld_evidence_items": {"type": "integer", "minimum": 0}
+      }
+    },
+    "evidence_quality": {"enum": ["complete", "degraded"]},
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine", "model", "limitations"],
+      "properties": {
+        "engine": {"const": "ai-auditor-static-rules/v1"},
+        "model": {"const": null},
+        "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "critical", "high", "medium", "low", "info"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "critical": {"type": "integer", "minimum": 0},
+        "high": {"type": "integer", "minimum": 0},
+        "medium": {"type": "integer", "minimum": 0},
+        "low": {"type": "integer", "minimum": 0},
+        "info": {"type": "integer", "minimum": 0}
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "severity", "category", "status", "confidence", "rationale", "impact", "recommendation", "evidence"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^AIA-[0-9]{4}$"},
+          "title": {"type": "string", "minLength": 1},
+          "severity": {"enum": ["critical", "high", "medium", "low", "info"]},
+          "category": {"type": "string", "minLength": 1},
+          "status": {"enum": ["open", "accepted", "resolved", "not_applicable"]},
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+          "rationale": {"type": "string", "minLength": 1},
+          "impact": {"type": "string", "minLength": 1},
+          "recommendation": {"type": "string", "minLength": 1},
+          "evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["observation_count", "sections", "details"],
+            "properties": {
+              "observation_count": {"type": "integer", "minimum": 1},
+              "sections": {"type": "array", "items": {"enum": ["accounts", "collection", "filesystems", "systemd.failed_units", "other"]}, "minItems": 1, "uniqueItems": true},
+              "details": {"const": "withheld"}
+            }
+          }
+        }
+      }
+    }
+  }
+}
