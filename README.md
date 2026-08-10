@@ -290,7 +290,7 @@ bash modules/audit/tests/test-inventory-collector.sh
 
 ### Phase 1: Auditing (🧪 Alpha)
 - Core user account and SSH setup scripts
-- Fixed inventory collector and narrow sudo configuration
+- Root-only inventory pipeline with one sanitized report sudo capability
 - Initial collector boundary tests and threat model
 - Target-host validation, findings, and reporting remain in progress
 

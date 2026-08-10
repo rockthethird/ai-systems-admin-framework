@@ -4,7 +4,7 @@ Date: 2026-08-10
 
 ## Goal and design
 
-Build a lightweight home-lab auditor with broad evidence discovery, narrow explicit authority, bounded output, and a small maintenance surface. The current privilege boundary is one root-owned, no-argument inventory collector rather than a general collection of “read-only” Unix commands.
+Build a lightweight home-lab auditor with broad evidence discovery, narrow explicit authority, bounded output, and a small maintenance surface. The current AI-facing privilege boundary is one root-owned, no-argument sanitized report endpoint rather than a general collection of “read-only” Unix commands.
 
 The AI is not trusted as a system administrator. It may analyze broad evidence, but new execution authority must be introduced as fixed, reviewed collectors with explicit escalation points.
 
@@ -16,10 +16,10 @@ The AI is not trusted as a system administrator. It may analyze broad evidence, 
   - Uses absolute child executable paths, a fixed environment, closed stdin, isolated process groups, 10-second timeouts, 1 MiB per-stream caps, and item limits.
   - Rejects all command-line arguments.
 - `modules/audit/deploy/15-deploy-inventory-collector.sh`
-  - Validates Python syntax without writing to the source checkout.
-  - Installs a root-owned candidate and atomically renames it into place.
+  - Validates Python and shell syntax without writing to the source checkout.
+  - Installs the collector, analyzer, and sanitizer as root-only helpers and activates the public report endpoint last.
 - `modules/audit/configure/enabled-commands.yaml` and `lib/sudoers.sh`
-  - Generate one `root:root` collector rule.
+  - Generate one `root:root` sanitized report rule; the raw collector is absent.
   - Emit sudoers `""` so the rule matches no-argument execution only.
 - `modules/audit/deploy/30-configure-sudoers.sh`
   - Resolves its artifact path independently of the caller's working directory.
@@ -31,6 +31,7 @@ The AI is not trusted as a system administrator. It may analyze broad evidence, 
 - `modules/audit/reporting/analyze-inventory.py` provides an initial deterministic, unprivileged analysis pass for capacity, failed services, UID 0 identities, and evidence completeness.
 - `modules/audit/reporting/sanitize-findings.py` produces a fail-closed `external-safe/v1` view for Hermes. It withholds host identifiers, timestamps, raw evidence, and JSON pointers while retaining controlled rule text, severity, confidence, hashes, evidence counts, and completeness.
 - `modules/audit/reporting/prepare-external-report.sh` runs local analysis followed by sanitization so raw inventory and evidence-rich findings do not enter the normal model-facing workflow.
+- `modules/audit/reporting/ai-auditor-report.sh` is the installed AI-facing endpoint. It creates root-only temporary evidence, calls the private collector/analyzer/sanitizer chain, emits only external-safe JSON, and removes intermediate artifacts on exit.
 
 ## Validation completed
 
@@ -41,16 +42,15 @@ Local checks passed:
 - `git diff --check`
 - Generated sudoers parsing with `visudo`
 
-An end-to-end deployment passed inside a disposable Debian 13 container built from the local Hermes image:
+The original raw collector boundary passed end-to-end deployment inside a disposable Debian 13 container built from the local Hermes image. The current sanitized endpoint was then deployed and tested directly on the disposable VM host:
 
-- installation from a read-only repository mount,
-- root ownership and modes (`0755` collector, `0440` sudoers),
-- valid JSON via the allowed sudo command,
-- rejection of collector arguments,
-- denial of an attempted `/bin/sh`,
-- and an exact no-argument rule shown by `sudo -l -U ai-auditor`.
-
-The host VM has an existing `ai-auditor` account and `visudo`, but host deployment was not run because `sudo` requires an interactive password unavailable to this session.
+- root-only modes (`0700`) for the collector, analyzer, and sanitizer,
+- `0755` for the public report endpoint and `0440` for sudoers,
+- valid `ai-auditor-external-findings/v1` through the allowed sudo command,
+- absence of the VM hostname and raw evidence from the returned document,
+- direct and sudo denial of the raw collector,
+- rejection of report arguments and denial of an attempted `/bin/sh`,
+- and an exact report-only rule shown by `sudo -l -U ai-auditor`.
 
 ## Hermes review
 
@@ -60,7 +60,7 @@ Hermes currently runs on the audited host with direct Docker and SSH paths only 
 
 ## Known limitations and next work
 
-1. Repeat end-to-end deployment on the actual target VM and additional supported distributions.
+1. Repeat end-to-end deployment on additional supported distributions and future remote targets.
 2. Repeat the fixed-command syscall trace on the target VM, including its real systemd and optional Docker paths.
 3. Expand unprivileged analysis rules only from conditions observed in real audit evidence.
 4. Add narrow drill-down collectors only when real audit evidence demonstrates a need.

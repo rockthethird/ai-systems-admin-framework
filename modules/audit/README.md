@@ -4,14 +4,14 @@ Experimental, least-privilege host inventory for AI-assisted auditing.
 
 ## Current capability
 
-The module creates an `ai-auditor` service account and grants it one privileged operation: execute `/usr/local/libexec/ai-auditor-inventory` with no arguments. The collector emits bounded JSON describing host identity, filesystems, networking, systemd, accounts, packages, scheduled-task locations, and—when the Docker client and daemon access are available—container metadata.
+The module creates an `ai-auditor` service account and grants it one privileged operation: execute `/usr/local/libexec/ai-auditor-report` with no arguments. That endpoint collects bounded raw evidence through root-only helpers, analyzes it locally, and returns only `ai-auditor-external-findings/v1`. The service account cannot execute or sudo the raw inventory collector.
 
 This is an inventory, deterministic findings, and external-safe reporting prototype. Adaptive drill-down and remediation are not implemented. The module is alpha software and is not production-ready.
 
 ## Security model
 
-- Broad discovery is implemented inside one root-owned, fixed collector.
-- Sudo permits the exact collector path as `root:root`; arbitrary commands and arguments are not granted.
+- Broad discovery is implemented inside one root-only, fixed collector.
+- Sudo permits the exact sanitized report endpoint as `root:root`; arbitrary commands, arguments, and raw collection are not granted.
 - Child commands use absolute paths, a fixed environment, a timeout, and byte/item output limits.
 - Collector and sudoers deployments validate a temporary candidate before atomic activation.
 - SSH and sudo logs provide evidence, but complete centralized auditability is not yet implemented.
@@ -37,7 +37,8 @@ sudo bash modules/audit/deploy/15-deploy-inventory-collector.sh
 sudo bash modules/audit/deploy/30-configure-sudoers.sh
 
 # Positive and negative authorization checks
-sudo -u ai-auditor sudo -n /usr/local/libexec/ai-auditor-inventory
+sudo -u ai-auditor sudo -n /usr/local/libexec/ai-auditor-report
+sudo -u ai-auditor sudo -n /usr/local/libexec/ai-auditor-inventory  # must be denied
 sudo -u ai-auditor sudo -n /bin/sh -c id   # must be denied
 ```
 

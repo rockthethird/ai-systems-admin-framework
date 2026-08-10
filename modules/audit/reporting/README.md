@@ -40,6 +40,14 @@ The external-safe sanitizer:
 
 This is a default data-minimization guardrail. It becomes a hard confidentiality boundary only when Hermes cannot bypass it through unrestricted SSH, Docker, filesystem, or other host access.
 
+On a deployed target, Hermes does not call the raw collector or this controller-side helper directly. Its sole privileged command is:
+
+```bash
+sudo -n /usr/local/libexec/ai-auditor-report
+```
+
+The installed endpoint creates root-only temporary inventory and findings, runs the private collector/analyzer/sanitizer chain, emits only the external-safe document, and removes intermediates on exit. The raw collector and reporting helpers are installed `root:root 0700` and are absent from sudoers.
+
 Validate the schema and example with:
 
 ```bash
@@ -54,4 +62,4 @@ Generate an initial deterministic report without elevated privileges:
 modules/audit/reporting/analyze-inventory.py inventory.json --output findings.json
 ```
 
-The initial static rules flag filesystems at or above 90% utilization, failed systemd units, additional UID 0 accounts, and incomplete collection evidence. Rule IDs are stable. The analyzer and sanitizer perform no subprocess or network operations; the shell wrapper invokes only those two pinned local programs.
+The initial static rules flag filesystems at or above 90% utilization, failed systemd units, additional UID 0 accounts, and incomplete collection evidence. Rule IDs are stable. The analyzer and sanitizer perform no subprocess or network operations. The controller helper invokes those two pinned local programs; the installed endpoint additionally invokes the fixed root-only collector.

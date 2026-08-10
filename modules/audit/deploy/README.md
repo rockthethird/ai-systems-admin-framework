@@ -8,7 +8,7 @@ Run deployment against a snapshot-backed or disposable Linux target. The scripts
 # Target: create the service account
 sudo bash modules/audit/deploy/10-create-user.sh
 
-# Target: install and smoke-test the fixed collector atomically
+# Target: install root-only audit helpers and the sanitized endpoint
 sudo bash modules/audit/deploy/15-deploy-inventory-collector.sh
 
 # Controller: optionally provision the SSH key
@@ -29,17 +29,21 @@ The sudoers deployment requires `visudo`; skipping validation is not an acceptab
 ## Verify
 
 ```bash
-sudo -u ai-auditor sudo -n /usr/local/libexec/ai-auditor-inventory > /tmp/inventory.json
-python3 -m json.tool /tmp/inventory.json >/dev/null
+sudo -u ai-auditor sudo -n /usr/local/libexec/ai-auditor-report > /tmp/external-findings.json
+python3 -m json.tool /tmp/external-findings.json >/dev/null
 
 # These must fail.
-sudo -u ai-auditor sudo -n /usr/local/libexec/ai-auditor-inventory unexpected
+sudo -u ai-auditor /usr/local/libexec/ai-auditor-inventory
+sudo -u ai-auditor sudo -n /usr/local/libexec/ai-auditor-inventory
+sudo -u ai-auditor sudo -n /usr/local/libexec/ai-auditor-report unexpected
 sudo -u ai-auditor sudo -n /bin/sh -c id
 
 sudo visudo -c -f /etc/sudoers.d/ai-auditor
-sudo stat -c '%U:%G %a %n' /usr/local/libexec/ai-auditor-inventory /etc/sudoers.d/ai-auditor
+sudo stat -c '%U:%G %a %n' /usr/local/libexec/ai-auditor-{inventory,analyze-inventory,sanitize-findings,report} /etc/sudoers.d/ai-auditor
 sudo -l -U ai-auditor
 ```
+
+Expected modes are `0700` for the raw collector, analyzer, and sanitizer; `0755` for the report endpoint; and `0440` for sudoers. Only the report endpoint appears in `sudo -l`.
 
 Inspect `/var/log/sudo-ai-auditor.log` if the platform's sudo build honors the configured logfile. Centralized or tamper-resistant log export is not currently provided.
 
