@@ -10,7 +10,12 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-python3 -c 'import pathlib, sys; source = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); compile(source, sys.argv[1], "exec")' "$SOURCE"
+if [ ! -x /usr/bin/python3 ]; then
+    echo "ERROR: /usr/bin/python3 is required" >&2
+    exit 1
+fi
+
+/usr/bin/python3 -c 'import pathlib, sys; source = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"); compile(source, sys.argv[1], "exec")' "$SOURCE"
 install -d -o root -g root -m 0755 "$(dirname "$DESTINATION")"
 temporary="$(mktemp /usr/local/libexec/.ai-auditor-inventory.XXXXXX)"
 trap 'rm -f "$temporary"' EXIT

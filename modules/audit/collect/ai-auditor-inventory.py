@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """Emit a bounded, read-only Linux host inventory as JSON."""
 
 from __future__ import annotations

@@ -6,6 +6,11 @@ readonly COLLECTOR="$SCRIPT_DIR/../collect/ai-auditor-inventory.py"
 readonly OUTPUT="$(mktemp)"
 trap 'rm -f "$OUTPUT"' EXIT
 
+if [ "$(head -n 1 "$COLLECTOR")" != "#!/usr/bin/python3" ]; then
+    echo "collector must use the fixed /usr/bin/python3 interpreter" >&2
+    exit 1
+fi
+
 python3 "$COLLECTOR" > "$OUTPUT"
 python3 - "$OUTPUT" <<'PY'
 import json
