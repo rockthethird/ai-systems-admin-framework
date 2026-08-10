@@ -27,6 +27,7 @@ The fixed child-command review and current trace limitations are recorded in [CO
 bash modules/audit/build/10-generate-sudoers-from-yaml.sh
 bash modules/audit/tests/test-inventory-collector.sh
 bash modules/audit/tests/test-sudoers-generation.sh
+bash modules/audit/tests/test-findings-schema.sh
 
 # On a disposable target, from the repository root
 sudo bash modules/audit/deploy/10-create-user.sh
@@ -43,6 +44,8 @@ SSH key setup and SSH hardening are separate steps; see [deploy/README.md](deplo
 ## Next milestones
 
 1. Repeat end-to-end deployment and denial testing on supported Linux distributions.
-2. Define a versioned findings/report schema that consumes inventory without more privilege.
+2. Implement an unprivileged analysis pass that emits the versioned findings schema.
 3. Add drill-down collectors only when real audits identify missing evidence.
 4. Add centralized, tamper-resistant logging before making stronger auditability claims.
+
+The initial unprivileged report contract is documented in [reporting/README.md](reporting/README.md).
