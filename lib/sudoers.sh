@@ -61,18 +61,25 @@ EOF
     fi
     
     # Generate a rule for each command
+    local auditor_users=()
     for cmd_name in "${commands_array[@]}"; do
+        local cmd_user=$(get_yaml_field "$yaml_file" "$cmd_name" "user")
         local cmd_path=$(get_yaml_field "$yaml_file" "$cmd_name" "path")
         local cmd_args=$(get_yaml_field "$yaml_file" "$cmd_name" "args")
         local cmd_desc=$(get_yaml_field "$yaml_file" "$cmd_name" "description")
         
-        if [ -z "$cmd_path" ]; then
-            log_warn "Skipping command '$cmd_name': no path defined"
-            continue
+        if [[ ! "$cmd_user" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+            log_error "Command '$cmd_name' has an invalid or missing user"
+            return 1
         fi
+        if [[ ! "$cmd_path" =~ ^/[A-Za-z0-9_./-]+$ ]]; then
+            log_error "Command '$cmd_name' has an invalid or missing absolute path"
+            return 1
+        fi
+        auditor_users+=("$cmd_user")
         
         # Build the sudoers rule
-        local rule="ai-auditor ALL=(root:root) NOPASSWD: $cmd_path"
+        local rule="$cmd_user ALL=(root:root) NOPASSWD: $cmd_path"
         if [ -n "$cmd_args" ]; then
             rule="$rule $cmd_args"
         else
@@ -89,36 +96,30 @@ EOF
         echo "$rule"
     done
     
-    # Append security hardening footer
+    # Append security hardening footer for every configured identity.
     cat << 'EOF'
 
 ################################################################################
 # Environment Hardening
 ################################################################################
-
-# Reset environment to secure defaults
-Defaults:ai-auditor env_reset
-
-# Restrict PATH to known-safe locations
-Defaults:ai-auditor secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-
-# Explicitly block dangerous environment variables
-Defaults:ai-auditor env_delete="LD_PRELOAD LD_LIBRARY_PATH PYTHONPATH PATH_ORIG LD_AUDIT LD_DEBUG"
-
-# Preserve only locale-related variables (safe to keep)
-Defaults:ai-auditor env_keep="LANGUAGE LANG LC_*"
-
-################################################################################
-# Logging Configuration
-################################################################################
-
-# Log all ai-auditor sudo commands to file
-Defaults:ai-auditor logfile="/var/log/sudo-ai-auditor.log"
-
-# Require no terminal (for SSH automation)
-Defaults:ai-auditor !requiretty
-
 EOF
+
+    local seen_users=" "
+    for audit_user in "${auditor_users[@]}"; do
+        if [[ "$seen_users" == *" $audit_user "* ]]; then
+            continue
+        fi
+        seen_users+="$audit_user "
+        cat << EOF
+# Harden and log $audit_user independently.
+Defaults:$audit_user env_reset
+Defaults:$audit_user secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Defaults:$audit_user env_delete="LD_PRELOAD LD_LIBRARY_PATH PYTHONPATH PATH_ORIG LD_AUDIT LD_DEBUG"
+Defaults:$audit_user env_keep="LANGUAGE LANG LC_*"
+Defaults:$audit_user logfile="/var/log/sudo-$audit_user.log"
+Defaults:$audit_user !requiretty
+EOF
+    done
     
     return 0
 }

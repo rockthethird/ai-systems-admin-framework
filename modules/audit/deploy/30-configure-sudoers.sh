@@ -24,6 +24,7 @@ set -euo pipefail
 # Configuration
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AI_AUDITOR_USER="ai-auditor"
+readonly AUDITOR_USERS=("ai-auditor-cloud" "ai-auditor-local")
 SUDOERS_DIR="/etc/sudoers.d"
 SUDOERS_FILE="$SUDOERS_DIR/$AI_AUDITOR_USER"
 SUDOERS_DEFAULT="$SCRIPT_DIR/../build/sudoers-ai-auditor-generated"
@@ -141,14 +142,14 @@ fi
 verify_prerequisites() {
     log_info "Step 1: Verifying prerequisites"
     
-    # Check if ai-auditor user exists
-    if ! id "$AI_AUDITOR_USER" &>/dev/null; then
-        log_error "User '$AI_AUDITOR_USER' does not exist"
-        log_error "Please run 10-create-user.sh first"
-        return 1
-    fi
-    
-    log_info "✓ User '$AI_AUDITOR_USER' exists"
+    for auditor_user in "${AUDITOR_USERS[@]}"; do
+        if ! id "$auditor_user" &>/dev/null; then
+            log_error "User '$auditor_user' does not exist"
+            log_error "Please run 12-create-report-identities.sh first"
+            return 1
+        fi
+        log_info "✓ User '$auditor_user' exists"
+    done
 
     if [ "$HAVE_VISUDO" = false ]; then
         log_error "visudo is required; refusing to deploy an unvalidated policy"
@@ -293,10 +294,17 @@ verify_deployment() {
         errors=$((errors + 1))
     fi
     
-    if grep -q "/usr/local/libexec/ai-auditor-report" "$SUDOERS_FILE"; then
-        log_info "✓ File contains sanitized report endpoint"
+    if grep -Fq 'ai-auditor-cloud ALL=(root:root) NOPASSWD: /usr/local/libexec/ai-auditor-report ""' "$SUDOERS_FILE"; then
+        log_info "✓ Cloud identity has the external-safe report endpoint"
     else
-        log_error "File does not contain sanitized report endpoint"
+        log_error "Cloud identity does not have the exact external-safe endpoint"
+        errors=$((errors + 1))
+    fi
+
+    if grep -Fq 'ai-auditor-local ALL=(root:root) NOPASSWD: /usr/local/libexec/ai-auditor-report-internal ""' "$SUDOERS_FILE"; then
+        log_info "✓ Local identity has the internal-rich report endpoint"
+    else
+        log_error "Local identity does not have the exact internal-rich endpoint"
         errors=$((errors + 1))
     fi
 
@@ -336,13 +344,16 @@ display_test_instructions() {
     echo ""
     echo "To test Phase 1 sudoers configuration:"
     echo ""
-    echo "  # Test sanitized report endpoint (should emit JSON):"
-    echo "  sudo -u ai-auditor sudo -n /usr/local/libexec/ai-auditor-report"
+    echo "  # Test the external-safe cloud identity:"
+    echo "  sudo -u ai-auditor-cloud sudo -n /usr/local/libexec/ai-auditor-report"
     echo ""
-    echo "  # Expected output: one external-safe findings document"
+    echo "  # Test the internal-rich local identity:"
+    echo "  sudo -u ai-auditor-local sudo -n /usr/local/libexec/ai-auditor-report-internal"
+    echo ""
+    echo "  # Expected output: external-safe and internal-rich findings documents"
     echo ""
     echo "  # Test denied command (should fail):"
-    echo "  sudo -u ai-auditor sudo /bin/ls /root"
+    echo "  sudo -u ai-auditor-cloud sudo /bin/ls /root"
     echo ""
     echo "  # Expected output: ai-auditor is not allowed to run /bin/ls /root"
     echo ""
@@ -386,7 +397,7 @@ main() {
         echo "=========================================="
         echo ""
         echo "Deployment details:"
-        echo "  User: $AI_AUDITOR_USER"
+        echo "  Users: ${AUDITOR_USERS[*]}"
         echo "  Sudoers file: $SUDOERS_FILE"
         echo "  Permissions: 440"
         echo ""

@@ -1,33 +1,25 @@
 # This file is auto-generated - DO NOT EDIT DIRECTLY
-# Generated at: 2026-08-10 20:59:59 UTC
+# Generated at: 2026-08-10 21:35:00 UTC
 # Modify the YAML config and regenerate to update
 #
 
-ai-auditor ALL=(root:root) NOPASSWD: /usr/local/libexec/ai-auditor-report ""  # Collect, analyze, and return external-safe findings JSON
+ai-auditor-cloud ALL=(root:root) NOPASSWD: /usr/local/libexec/ai-auditor-report ""  # Collect, analyze, and return external-safe findings JSON
+ai-auditor-local ALL=(root:root) NOPASSWD: /usr/local/libexec/ai-auditor-report-internal ""  # Collect, analyze, and return finding-focused internal JSON
 
 ################################################################################
 # Environment Hardening
 ################################################################################
-
-# Reset environment to secure defaults
-Defaults:ai-auditor env_reset
-
-# Restrict PATH to known-safe locations
-Defaults:ai-auditor secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-
-# Explicitly block dangerous environment variables
-Defaults:ai-auditor env_delete="LD_PRELOAD LD_LIBRARY_PATH PYTHONPATH PATH_ORIG LD_AUDIT LD_DEBUG"
-
-# Preserve only locale-related variables (safe to keep)
-Defaults:ai-auditor env_keep="LANGUAGE LANG LC_*"
-
-################################################################################
-# Logging Configuration
-################################################################################
-
-# Log all ai-auditor sudo commands to file
-Defaults:ai-auditor logfile="/var/log/sudo-ai-auditor.log"
-
-# Require no terminal (for SSH automation)
-Defaults:ai-auditor !requiretty
-
+# Harden and log ai-auditor-cloud independently.
+Defaults:ai-auditor-cloud env_reset
+Defaults:ai-auditor-cloud secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Defaults:ai-auditor-cloud env_delete="LD_PRELOAD LD_LIBRARY_PATH PYTHONPATH PATH_ORIG LD_AUDIT LD_DEBUG"
+Defaults:ai-auditor-cloud env_keep="LANGUAGE LANG LC_*"
+Defaults:ai-auditor-cloud logfile="/var/log/sudo-ai-auditor-cloud.log"
+Defaults:ai-auditor-cloud !requiretty
+# Harden and log ai-auditor-local independently.
+Defaults:ai-auditor-local env_reset
+Defaults:ai-auditor-local secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Defaults:ai-auditor-local env_delete="LD_PRELOAD LD_LIBRARY_PATH PYTHONPATH PATH_ORIG LD_AUDIT LD_DEBUG"
+Defaults:ai-auditor-local env_keep="LANGUAGE LANG LC_*"
+Defaults:ai-auditor-local logfile="/var/log/sudo-ai-auditor-local.log"
+Defaults:ai-auditor-local !requiretty

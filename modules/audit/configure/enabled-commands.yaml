@@ -15,6 +15,13 @@
 
 commands:
   - name: "external-safe-audit-report"
+    user: "ai-auditor-cloud"
     path: "/usr/local/libexec/ai-auditor-report"
     args: ""
     description: "Collect, analyze, and return external-safe findings JSON"
+
+  - name: "internal-rich-audit-report"
+    user: "ai-auditor-local"
+    path: "/usr/local/libexec/ai-auditor-report-internal"
+    args: ""
+    description: "Collect, analyze, and return finding-focused internal JSON"
