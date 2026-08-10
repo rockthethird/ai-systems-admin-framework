@@ -24,17 +24,17 @@ commands:
     args: "-T"
     description: "Inspect effective SSH daemon configuration"
 
-  - name: "ssh-inspect-stat"
+  - name: "ssh-inspect-config-metadata"
     path: "/usr/bin/stat"
-    args: "-c %a %U %G %n /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf"
+    args: "-c %a %U %G %n /etc/ssh/sshd_config /etc/ssh/sshd_config.d/50-cloud-init.conf"
     description: "Check SSH config file permissions and ownership"
 
-  - name: "ssh-inspect-cat"
+  - name: "ssh-inspect-config-contents"
     path: "/usr/bin/cat"
-    args: "/etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf"
+    args: "/etc/ssh/sshd_config /etc/ssh/sshd_config.d/50-cloud-init.conf"
     description: "Read SSH daemon configuration files"
 
   - name: "ssh-inspect-auth-methods"
     path: "/usr/bin/grep"
-    args: "-E -H -e PasswordAuthentication -e PermitRootLogin -e PubkeyAuthentication /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf"
+    args: "-E -H -e PasswordAuthentication -e PermitRootLogin -e PubkeyAuthentication /etc/ssh/sshd_config /etc/ssh/sshd_config.d/50-cloud-init.conf"
     description: "Check SSH authentication methods configuration"
