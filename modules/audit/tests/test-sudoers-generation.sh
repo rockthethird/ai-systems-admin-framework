@@ -8,9 +8,14 @@ trap 'rm -f "$OUTPUT"' EXIT
 
 bash "$MODULE_DIR/build/10-generate-sudoers-from-yaml.sh" --output "$OUTPUT" >/dev/null
 
-expected='ai-auditor ALL=(root:root) NOPASSWD: /usr/local/libexec/ai-auditor-inventory ""'
+expected='ai-auditor ALL=(root:root) NOPASSWD: /usr/local/libexec/ai-auditor-report ""'
 if ! grep -Fq "$expected" "$OUTPUT"; then
-    echo "generated sudoers does not enforce a root-only, no-argument collector" >&2
+    echo "generated sudoers does not enforce a root-only, no-argument sanitized report" >&2
+    exit 1
+fi
+
+if grep -Fq '/usr/local/libexec/ai-auditor-inventory' "$OUTPUT"; then
+    echo "generated sudoers unexpectedly exposes the raw inventory collector" >&2
     exit 1
 fi
 

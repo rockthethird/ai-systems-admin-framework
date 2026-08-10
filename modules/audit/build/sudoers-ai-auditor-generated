@@ -1,9 +1,9 @@
 # This file is auto-generated - DO NOT EDIT DIRECTLY
-# Generated at: 2026-08-10 17:27:23 UTC
+# Generated at: 2026-08-10 20:59:59 UTC
 # Modify the YAML config and regenerate to update
 #
 
-ai-auditor ALL=(root:root) NOPASSWD: /usr/local/libexec/ai-auditor-inventory ""  # Collect bounded host inventory as JSON
+ai-auditor ALL=(root:root) NOPASSWD: /usr/local/libexec/ai-auditor-report ""  # Collect, analyze, and return external-safe findings JSON
 
 ################################################################################
 # Environment Hardening

@@ -14,7 +14,7 @@
 #
 
 commands:
-  - name: "host-inventory"
-    path: "/usr/local/libexec/ai-auditor-inventory"
+  - name: "external-safe-audit-report"
+    path: "/usr/local/libexec/ai-auditor-report"
     args: ""
-    description: "Collect bounded host inventory as JSON"
+    description: "Collect, analyze, and return external-safe findings JSON"

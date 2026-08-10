@@ -293,11 +293,18 @@ verify_deployment() {
         errors=$((errors + 1))
     fi
     
-    if grep -q "/usr/local/libexec/ai-auditor-inventory" "$SUDOERS_FILE"; then
-        log_info "✓ File contains inventory collector"
+    if grep -q "/usr/local/libexec/ai-auditor-report" "$SUDOERS_FILE"; then
+        log_info "✓ File contains sanitized report endpoint"
     else
-        log_error "File does not contain inventory collector"
+        log_error "File does not contain sanitized report endpoint"
         errors=$((errors + 1))
+    fi
+
+    if grep -q "/usr/local/libexec/ai-auditor-inventory" "$SUDOERS_FILE"; then
+        log_error "File unexpectedly exposes the raw inventory collector"
+        errors=$((errors + 1))
+    else
+        log_info "✓ Raw inventory collector is not exposed through sudo"
     fi
 
     local owner
@@ -329,10 +336,10 @@ display_test_instructions() {
     echo ""
     echo "To test Phase 1 sudoers configuration:"
     echo ""
-    echo "  # Test inventory collector (should emit JSON):"
-    echo "  sudo -u ai-auditor sudo -n /usr/local/libexec/ai-auditor-inventory"
+    echo "  # Test sanitized report endpoint (should emit JSON):"
+    echo "  sudo -u ai-auditor sudo -n /usr/local/libexec/ai-auditor-report"
     echo ""
-    echo "  # Expected output: one JSON inventory document"
+    echo "  # Expected output: one external-safe findings document"
     echo ""
     echo "  # Test denied command (should fail):"
     echo "  sudo -u ai-auditor sudo /bin/ls /root"
