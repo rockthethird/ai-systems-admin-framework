@@ -1,295 +1,46 @@
-# Auditing Module
+# AI Auditor
 
-> **Read-only infrastructure auditing with AI agents**
+Experimental, least-privilege host inventory for AI-assisted auditing.
 
-Complete, production-ready framework for deploying an AI agent that can safely inspect infrastructure across your network.
+## Current capability
 
----
+The module creates an `ai-auditor` service account and grants it one privileged operation: execute `/usr/local/libexec/ai-auditor-inventory` with no arguments. The collector emits bounded JSON describing host identity, filesystems, networking, systemd, accounts, packages, scheduled-task locations, and—when the Docker client and daemon access are available—container metadata.
 
-## 🎯 What This Module Does
+This is an inventory and evidence-collection layer. Finding generation, adaptive drill-down, reporting, and remediation are not implemented yet. The module is alpha software and is not production-ready.
 
-The auditing module allows an AI agent to:
+## Security model
 
-✅ **Inspect Infrastructure**
-- View network configuration and listening services
-- Check running processes and services
-- Review system configuration files
-- Analyze installed packages
+- Broad discovery is implemented inside one root-owned, fixed collector.
+- Sudo permits the exact collector path as `root:root`; arbitrary commands and arguments are not granted.
+- Child commands use absolute paths, a fixed environment, a timeout, and byte/item output limits.
+- Collector and sudoers deployments validate a temporary candidate before atomic activation.
+- SSH and sudo logs provide evidence, but complete centralized auditability is not yet implemented.
 
-✅ **Security Assessment**
-- Audit Linux capabilities
-- Review sudo configuration
-- Scan for SUID binaries
-- Check file permissions
+The collector is privileged code. Its output can contain sensitive host, account, network, package, and container metadata. Docker daemon access is optional and must be reviewed separately. See [THREAT-MODEL.md](docs/THREAT-MODEL.md).
 
-✅ **Monitoring & Compliance**
-- Review system and application logs
-- Check service health status
-- Verify security settings
-- Generate audit reports
-
-❌ **What It Cannot Do**
-- Modify any files or configurations
-- Install/remove packages
-- Restart/stop services
-- Escalate privileges
-- Execute unauthorized commands
-
----
-
-## 🚀 Quick Start
-
-**Estimated Time:** 5-10 hours over 1-2 weeks
-
-### 1. Read the Documentation
-
-Start with the implementation guide:
+## Build, deploy, and test
 
 ```bash
-# Read the overview and strategy
-cat docs/00-PROJECT-PLAN.md
+# On the controller
+bash modules/audit/build/10-generate-sudoers-from-yaml.sh
+bash modules/audit/tests/test-inventory-collector.sh
+bash modules/audit/tests/test-sudoers-generation.sh
 
-# Read the detailed implementation roadmap
-cat docs/IMPLEMENTATION-ROADMAP.md
+# On a disposable target, from the repository root
+sudo bash modules/audit/deploy/10-create-user.sh
+sudo bash modules/audit/deploy/15-deploy-inventory-collector.sh
+sudo bash modules/audit/deploy/30-configure-sudoers.sh
+
+# Positive and negative authorization checks
+sudo -u ai-auditor sudo -n /usr/local/libexec/ai-auditor-inventory
+sudo -u ai-auditor sudo -n /bin/sh -c id   # must be denied
 ```
 
-### 2. Follow the Setup Phases
+SSH key setup and SSH hardening are separate steps; see [deploy/README.md](deploy/README.md). Test on a snapshot or disposable host before wider use.
 
-**Phase 1: User Account & SSH (30 min)**
-```bash
-cat docs/01-USER-CREATION.md
-bash scripts/setup/10-create-user.sh
-bash scripts/setup/20-setup-ssh-keys.sh
-```
+## Next milestones
 
-**Phase 2: Sudo Configuration (1 hour)**
-```bash
-cat docs/02-SUDOERS-CONFIG.md
-bash scripts/setup/30-configure-sudoers.sh
-```
-
-**Phase 3: Validation Testing (2 hours)**
-```bash
-cat docs/03-VALIDATION-FRAMEWORK.md
-bash scripts/validate/validate-all.sh
-```
-
-**Phase 4: Risk Assessment (1 hour)**
-```bash
-cat docs/04-RISK-ASSESSMENT.md
-# Review security policies
-```
-
-### 3. Deploy
-
-Once validation passes 100%, you're ready to deploy to production.
-
----
-
-## 📁 Module Structure
-
-```
-audit/
-├── README.md                    (This file)
-├── docs/
-│   ├── 00-PROJECT-PLAN.md      (Strategic plan & phases)
-│   ├── 01-USER-CREATION.md     (User setup with SSH hardening)
-│   ├── 02-SUDOERS-CONFIG.md    (Sudo configuration guide)
-│   ├── 03-VALIDATION-FRAMEWORK.md (Testing & validation)
-│   ├── 04-RISK-ASSESSMENT.md   (Threat model & mitigations)
-│   └── IMPLEMENTATION-ROADMAP.md (Week-by-week implementation)
-│
-├── templates/
-│   ├── sudoers-ai-auditor      (Sudo configuration template)
-│   └── ai-auditor-commands.md  (Justification for each command)
-│
-├── scripts/
-│   ├── setup/
-│   │   ├── 10-create-user.sh          (Create ai-auditor account)
-│   │   └── 20-setup-ssh-keys.sh       (SSH key setup)
-│   │   └── 30-configure-sudoers.sh    (Deploy sudoers config)
-│   │
-│   └── validate/
-│       ├── 40-validate-static.sh      (27 configuration checks)
-│       ├── 50-validate-dynamic.sh     (18 permission tests)
-│       └── validate-all.sh            (Master validation suite)
-│
-└── tests/
-    ├── test-shell-escapes.sh      (8 shell escape vectors)
-    ├── test-privilege-escalation.sh (6 escalation vectors)
-    └── test-audit-logging.sh       (Logging verification)
-```
-
----
-
-## 🔐 Security Model
-
-### Three-Layer Defense
-
-1. **Authentication:** SSH keys only (no password, account locked)
-2. **Authorization:** Explicit sudoers allowlist (NOPASSWD, all logged)
-3. **Validation:** Automated tests (40+ checks, 14+ attack vectors)
-
-### Guarantees
-
-✅ No password authentication possible  
-✅ No interactive shell access  
-✅ Cannot escalate to root or other users  
-✅ Cannot modify files or configurations  
-✅ All actions logged and auditable  
-✅ Shell escapes blocked  
-✅ Privilege escalation blocked  
-
----
-
-## 📊 Testing Coverage
-
-### Static Validation (27 checks)
-- User account configuration
-- SSH key setup
-- Sudoers syntax and permissions
-- Shell environment
-- Audit logging
-
-### Dynamic Validation (18 tests)
-- Allowed commands execute correctly
-- Denied commands are blocked
-- Arguments validated
-- Logging works
-
-### Security Testing (14+ vectors)
-- 8 shell escape attempts blocked
-- 6 privilege escalation attempts blocked
-- 3 environment injection attempts blocked
-- Symlink exploitation prevented
-- SUID/capability abuse prevented
-- Information disclosure prevented
-
-**Run complete validation:**
-```bash
-bash scripts/validate/validate-all.sh
-```
-
----
-
-## 🎓 Learning Outcomes
-
-After completing this module, you'll understand:
-
-- How to create restricted Linux user accounts
-- SSH key-based authentication hardening
-- Sudo configuration and security best practices
-- Automated permission validation approaches
-- Threat modeling and risk assessment
-- Compliance frameworks (CIS, NIST)
-
----
-
-## 📋 Audit Commands
-
-The framework grants access to 8 command categories:
-
-1. **System Information** — OS version, hostname, kernel
-2. **Network Status** — Interfaces, routes, firewall rules (read-only)
-3. **Process Status** — Running processes, service status
-4. **File Inspection** — Configuration files (readable only, limited paths)
-5. **Package Query** — Installed packages (query-only)
-6. **Log Inspection** — System and application logs
-7. **Service Status** — Service health and enablement
-8. **Security Audit** — Capabilities, SUID binaries, sudoers review
-
-**All other commands are denied.**
-
-See [templates/ai-auditor-commands.md](templates/ai-auditor-commands.md) for justifications.
-
----
-
-## 🚀 Deployment
-
-### For Small Networks (10-20 hosts)
-
-1. Create ssh-auditor account on each host
-2. Deploy authorized_keys from control machine
-3. Configure sudoers on each host
-4. Run validation on each host
-5. Access from AI agent machine via SSH
-
-### For Large Networks (100+ hosts)
-
-1. Use Ansible/Terraform for automated deployment
-2. Store SSH keys in secure vault (HashiCorp Vault, AWS Secrets Manager)
-3. Centralize audit log collection
-4. Set up monitoring and alerting
-5. Use configuration management (Ansible, Chef, Puppet)
-
----
-
-## 🔄 Maintenance
-
-### Daily
-- Monitoring systems track access attempts
-- No manual action needed
-
-### Weekly
-- Run automated audits
-- Review access patterns
-- Check for suspicious activity
-
-### Monthly
-- Review and update sudoers if needed
-- Analyze audit logs for trends
-- Update documentation
-
-### Quarterly
-- Penetration testing
-- Security assessment
-- Capabilities audit
-
-### Annually
-- Full security review
-- Compliance validation
-- Risk assessment update
-
----
-
-## ❓ Common Questions
-
-### Q: Can I add more commands?
-
-**A:** Yes! Update sudoers template, test the command, run validation, update documentation, and assess risks. The framework makes this safe.
-
-### Q: What if I need to rotate SSH keys?
-
-**A:** Remove old key from authorized_keys, add new key, test access, destroy old key. See runbooks for detailed procedures.
-
-### Q: Can multiple AI agents use this account?
-
-**A:** Not recommended. Create separate accounts for each agent. This enables per-agent audit trails and independent permission management.
-
-### Q: How do I know it's working correctly?
-
-**A:** Run the validation suite. It performs 40+ checks across static configuration, dynamic permissions, and security testing.
-
-```bash
-bash scripts/validate/validate-all.sh
-```
-
-Expected: 100% pass rate.
-
----
-
-## 📞 Support
-
-- **Documentation:** See [docs/](docs/) directory
-- **Issues:** Report bugs in GitHub Issues
-- **Security:** See [SECURITY.md](../../SECURITY.md)
-
----
-
-## 📜 License
-
-MIT License — See root [LICENSE](../../LICENSE) file
-
----
-
-**Ready to audit your infrastructure safely?** Start with [docs/00-PROJECT-PLAN.md](docs/00-PROJECT-PLAN.md) 🚀
+1. Repeat end-to-end deployment and denial testing on supported Linux distributions.
+2. Define a versioned findings/report schema that consumes inventory without more privilege.
+3. Add drill-down collectors only when real audits identify missing evidence.
+4. Add centralized, tamper-resistant logging before making stronger auditability claims.

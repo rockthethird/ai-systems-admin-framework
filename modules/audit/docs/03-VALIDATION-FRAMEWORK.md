@@ -1,4 +1,6 @@
-# Phase 3: Validation Framework & Automated Testing
+# Phase 3: Validation Framework & Automated Testing (Design Proposal)
+
+> Most checks described here are planned, not implemented. See `modules/audit/tests/` for executable coverage.
 
 ## Overview
 This document describes the comprehensive testing and validation framework to verify that `ai-auditor` permissions are correctly restricted to read-only operations and cannot be exploited.

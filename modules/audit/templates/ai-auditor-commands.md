@@ -1,4 +1,6 @@
-# AI Auditor Service Account - Command Justification & Risk Assessment
+# AI Auditor Service Account - Command Justification & Risk Assessment (Historical)
+
+> This describes an earlier multi-command design. Those commands are not enabled. The fixed collector and `configure/enabled-commands.yaml` are authoritative.
 
 ## Overview
 This document provides justification for each command category allowed for the `ai-auditor` service account, including risk assessment and restrictions.

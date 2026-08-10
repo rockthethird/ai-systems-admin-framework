@@ -1,4 +1,6 @@
-# IMPLEMENTATION ROADMAP & EXECUTIVE SUMMARY
+# IMPLEMENTATION ROADMAP & EXECUTIVE SUMMARY (HISTORICAL)
+
+> This plan predates the fixed-collector design. Current status is documented in `modules/audit/README.md`.
 
 ## Project: AI Security Validation Framework for Linux Service Accounts
 

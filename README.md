@@ -2,7 +2,7 @@
 
 > **A comprehensive, security-first framework for deploying AI agents to perform autonomous infrastructure administration tasks across your network.**
 
-**Status:** 🚀 Alpha (Auditing module complete and production-ready)
+**Status:** Alpha. The auditing inventory path is experimental and not production-ready.
 
 ---
 
@@ -12,7 +12,7 @@ Enable autonomous AI agents to safely perform infrastructure administration task
 
 - **Least Privilege:** Each AI role has minimal permissions for its function
 - **Continuous Validation:** Automated tests verify restrictions and prevent privilege escalation
-- **Complete Auditability:** Every action logged, reviewed, and documented
+- **Auditability:** Preserve useful execution evidence and work toward centralized, tamper-resistant records
 - **Defense-in-Depth:** Multiple independent security layers
 - **Role-Based Access:** Different AI agents for different functions (audit, compliance, remediation, reporting, etc.)
 
@@ -24,11 +24,10 @@ This framework provides templates, validation frameworks, and security best prac
 
 ### Currently Available
 
-✅ **Auditing Module** — Read-only infrastructure auditing  
-- Inspect configurations, services, processes, logs
-- Network discovery and security posture assessment
-- Compliance and vulnerability scanning
-- Produced: Audit reports, findings
+🧪 **Auditing Module** — bounded host inventory prototype
+- Fixed privileged collector with a narrow sudo rule
+- Host, network, service, package, account, task, and optional container inventory
+- Findings, adaptive drill-down, compliance scanning, and reports are not implemented yet
 
 ### Planned Modules
 
@@ -171,8 +170,8 @@ bash scripts/setup/10-create-user.sh
 bash scripts/setup/20-setup-ssh-keys.sh
 bash scripts/setup/30-configure-sudoers.sh
 
-# 6. Validate everything works
-bash scripts/validate/validate-all.sh
+# 6. Run the currently implemented collector checks
+bash tests/test-inventory-collector.sh
 ```
 
 ### For Adding a New Module
@@ -199,34 +198,24 @@ All modules in this framework are built on:
    - Environment reset for injection prevention
 
 3. **Audit & Validation Layer**
-   - Comprehensive logging of all actions
-   - Automated permission validation (40+ tests)
-   - Attack vector simulation testing
-   - Continuous compliance monitoring
+   - Local sudo logging
+   - Collector schema and failure-boundary tests
+   - Manual target-host authorization checks
+   - Additional attack simulation and centralized monitoring remain future work
 
-### Guaranteed Constraints
+### Intended and currently tested constraints
 
 ✅ **No Password Authentication** — Only SSH keys  
-✅ **No Shell Access** — Cannot spawn interactive shells  
-✅ **Read-Only (Audit)** — Cannot modify production systems  
-✅ **Privilege Isolation** — Cannot escalate to root or other users  
-✅ **Attack Prevention** — Shell escapes blocked, env injection prevented  
-✅ **Complete Auditability** — Every action logged  
+🧪 **Narrow Sudo Surface** — One fixed collector path with no arguments
+🧪 **Bounded Collection** — Child output and execution time are capped
+⚠️ **Sensitive Output** — Inventory must be protected as infrastructure data
+⚠️ **Local Logging Only** — Tamper-resistant centralized audit logging is not implemented
 
 ---
 
-## 📊 Metrics
+## 📊 Validation status
 
-| Metric | Auditing Module |
-|--------|-----------------|
-| Documentation Files | 7 |
-| Configuration Templates | 2+ |
-| Setup Scripts | 3 |
-| Validation Scripts | 6+ |
-| Test Cases | 40+ |
-| Attack Vectors Tested | 14+ |
-| Risk Assessment | 8 vectors |
-| Implementation Time | 5-10 hours |
+The collector currently has executable schema, timeout, missing-command, and output-bound checks. Sudo allow/deny behavior must also be verified on every target host. Older design documents and audit reports are historical context, not evidence that their proposed test suites exist.
 
 ---
 
@@ -252,10 +241,9 @@ Every module includes comprehensive automated testing:
 - Environment variable injection prevented
 - Information disclosure prevention
 
-**Run complete validation:**
+**Run the implemented collector validation:**
 ```bash
-cd modules/audit
-bash scripts/validate/validate-all.sh
+bash modules/audit/tests/test-inventory-collector.sh
 ```
 
 ---
@@ -300,11 +288,11 @@ bash scripts/validate/validate-all.sh
 
 ## 🔄 Development Roadmap
 
-### Phase 1: Auditing (✅ Complete)
-- Core user account & SSH setup
-- Sudo configuration framework
-- Validation testing suite
-- Risk assessment
+### Phase 1: Auditing (🧪 Alpha)
+- Core user account and SSH setup scripts
+- Fixed inventory collector and narrow sudo configuration
+- Initial collector boundary tests and threat model
+- Target-host validation, findings, and reporting remain in progress
 
 ### Phase 2: Compliance (🔜 Q4 2026)
 - Policy validation framework
@@ -373,4 +361,4 @@ Star this repository to stay updated on new modules and features!
 
 ---
 
-*Making AI-driven infrastructure administration safe, auditable, and production-ready.*
+*Building a small, testable safety boundary for AI-assisted infrastructure auditing.*
