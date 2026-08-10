@@ -14,27 +14,7 @@
 #
 
 commands:
-  - name: "system-info"
-    path: "/usr/bin/uname"
-    args: "-a"
-    description: "Display system information (kernel, architecture, OS details)"
-
-  - name: "ssh-inspect-sshd-effective"
-    path: "/usr/sbin/sshd"
-    args: "-T"
-    description: "Inspect effective SSH daemon configuration"
-
-  - name: "ssh-inspect-config-metadata"
-    path: "/usr/bin/stat"
-    args: "-c %a %U %G %n /etc/ssh/sshd_config /etc/ssh/sshd_config.d/50-cloud-init.conf"
-    description: "Check SSH config file permissions and ownership"
-
-  - name: "ssh-inspect-config-contents"
-    path: "/usr/bin/cat"
-    args: "/etc/ssh/sshd_config /etc/ssh/sshd_config.d/50-cloud-init.conf"
-    description: "Read SSH daemon configuration files"
-
-  - name: "ssh-inspect-auth-methods"
-    path: "/usr/bin/grep"
-    args: "-E -H -e PasswordAuthentication -e PermitRootLogin -e PubkeyAuthentication /etc/ssh/sshd_config /etc/ssh/sshd_config.d/50-cloud-init.conf"
-    description: "Check SSH authentication methods configuration"
+  - name: "host-inventory"
+    path: "/usr/local/libexec/ai-auditor-inventory"
+    args: ""
+    description: "Collect bounded host inventory as JSON"

@@ -72,9 +72,13 @@ EOF
         fi
         
         # Build the sudoers rule
-        local rule="ai-auditor ALL=(ALL) NOPASSWD: $cmd_path"
+        local rule="ai-auditor ALL=(root:root) NOPASSWD: $cmd_path"
         if [ -n "$cmd_args" ]; then
             rule="$rule $cmd_args"
+        else
+            # In sudoers, an omitted argument expression permits any arguments.
+            # An explicit empty string matches only a no-argument invocation.
+            rule="$rule \"\""
         fi
         
         # Add comment with description

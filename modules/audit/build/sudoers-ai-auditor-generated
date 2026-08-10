@@ -1,13 +1,9 @@
 # This file is auto-generated - DO NOT EDIT DIRECTLY
-# Generated at: 2026-08-10 01:26:00 UTC
+# Generated at: 2026-08-10 17:27:23 UTC
 # Modify the YAML config and regenerate to update
 #
 
-ai-auditor ALL=(ALL) NOPASSWD: /usr/bin/uname -a  # Display system information (kernel, architecture, OS details)
-ai-auditor ALL=(ALL) NOPASSWD: /usr/sbin/sshd -T  # Inspect effective SSH daemon configuration
-ai-auditor ALL=(ALL) NOPASSWD: /usr/bin/stat -c %a %U %G %n /etc/ssh/sshd_config /etc/ssh/sshd_config.d/50-cloud-init.conf  # Check SSH config file permissions and ownership
-ai-auditor ALL=(ALL) NOPASSWD: /usr/bin/cat /etc/ssh/sshd_config /etc/ssh/sshd_config.d/50-cloud-init.conf  # Read SSH daemon configuration files
-ai-auditor ALL=(ALL) NOPASSWD: /usr/bin/grep -E -H -e PasswordAuthentication -e PermitRootLogin -e PubkeyAuthentication /etc/ssh/sshd_config /etc/ssh/sshd_config.d/50-cloud-init.conf  # Check SSH authentication methods configuration
+ai-auditor ALL=(root:root) NOPASSWD: /usr/local/libexec/ai-auditor-inventory ""  # Collect bounded host inventory as JSON
 
 ################################################################################
 # Environment Hardening
