@@ -22,12 +22,14 @@
 set -euo pipefail
 
 # Configuration
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AI_AUDITOR_USER="ai-auditor"
 SUDOERS_DIR="/etc/sudoers.d"
 SUDOERS_FILE="$SUDOERS_DIR/$AI_AUDITOR_USER"
-SUDOERS_DEFAULT="../build/sudoers-ai-auditor-generated"
+SUDOERS_DEFAULT="$SCRIPT_DIR/../build/sudoers-ai-auditor-generated"
 SUDOERS_BACKUP="$SUDOERS_FILE.backup.$(date +%Y%m%d-%H%M%S)"
 SUDOERS_SOURCE=""  # Set by parameter parsing or default
+SUDOERS_CANDIDATE=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -123,7 +125,7 @@ parse_parameters() {
 parse_parameters "$@"
 
 ################################################################################
-# Check for Optional Tools
+# Check for Required Tools
 ################################################################################
 
 # Check if visudo is available (optional)
@@ -147,6 +149,11 @@ verify_prerequisites() {
     fi
     
     log_info "✓ User '$AI_AUDITOR_USER' exists"
+
+    if [ "$HAVE_VISUDO" = false ]; then
+        log_error "visudo is required; refusing to deploy an unvalidated policy"
+        return 1
+    fi
     
     # Check if sudoers.d directory exists
     if [ ! -d "$SUDOERS_DIR" ]; then
@@ -177,7 +184,7 @@ backup_existing_sudoers() {
 ################################################################################
 
 deploy_sudoers() {
-    log_info "Step 3: Deploying sudoers configuration"
+    log_info "Step 3: Preparing sudoers configuration"
     
     # Use specified file, default, or fallback
     local sudoers_file=""
@@ -203,8 +210,9 @@ deploy_sudoers() {
         return 1
     fi
     
-    cp "$sudoers_file" "$SUDOERS_FILE"
-    log_info "✓ Sudoers file deployed to $SUDOERS_FILE"
+    SUDOERS_CANDIDATE=$(mktemp "$SUDOERS_DIR/.ai-auditor.XXXXXX")
+    install -o root -g root -m 0440 "$sudoers_file" "$SUDOERS_CANDIDATE"
+    log_info "✓ Root-owned candidate prepared"
 }
 
 ################################################################################
@@ -222,22 +230,17 @@ validate_sudoers_syntax() {
     fi
     
     # Use visudo to check syntax
-    if visudo -c -f "$SUDOERS_FILE" &>/dev/null; then
+    if visudo -c -f "$SUDOERS_CANDIDATE" &>/dev/null; then
         log_info "✓ Sudoers syntax is valid"
+        mv -f "$SUDOERS_CANDIDATE" "$SUDOERS_FILE"
+        SUDOERS_CANDIDATE=""
+        log_info "✓ Sudoers configuration activated atomically"
         return 0
     else
         log_error "Sudoers syntax validation failed!"
-        log_error "Rolling back to previous configuration..."
-        
-        # Rollback on syntax error
-        if [ -f "$SUDOERS_BACKUP" ]; then
-            cp "$SUDOERS_BACKUP" "$SUDOERS_FILE"
-            log_error "Restored from backup: $SUDOERS_BACKUP"
-        else
-            log_error "No backup available, removing invalid file"
-            rm "$SUDOERS_FILE"
-        fi
-        
+        rm -f "$SUDOERS_CANDIDATE"
+        SUDOERS_CANDIDATE=""
+        log_error "Existing configuration was left unchanged"
         return 1
     fi
 }
@@ -250,7 +253,8 @@ set_sudoers_permissions() {
     log_info "Step 5: Setting sudoers file permissions"
     
     # Sudoers files should be 0440 (r--r-----)
-    chmod 440 "$SUDOERS_FILE"
+    chown root:root "$SUDOERS_FILE"
+    chmod 0440 "$SUDOERS_FILE"
     
     log_info "✓ Sudoers file permissions set to 440"
 }
@@ -267,7 +271,7 @@ verify_deployment() {
     # Check file exists
     if [ ! -f "$SUDOERS_FILE" ]; then
         log_error "Sudoers file not found: $SUDOERS_FILE"
-        ((errors++))
+        errors=$((errors + 1))
     else
         log_info "✓ Sudoers file exists"
     fi
@@ -277,7 +281,8 @@ verify_deployment() {
     if [ "$perms" = "440" ]; then
         log_info "✓ Permissions correct (440)"
     else
-        log_warn "Permissions are $perms (expected 440)"
+        log_error "Permissions are $perms (expected 440)"
+        errors=$((errors + 1))
     fi
     
     # Check file content contains ai-auditor
@@ -285,27 +290,30 @@ verify_deployment() {
         log_info "✓ File contains ai-auditor configuration"
     else
         log_error "File does not contain ai-auditor configuration"
-        ((errors++))
+        errors=$((errors + 1))
     fi
     
-    # Check for uname command
-    if grep -q "/usr/bin/uname" "$SUDOERS_FILE"; then
-        log_info "✓ File contains uname command"
+    if grep -q "/usr/local/libexec/ai-auditor-inventory" "$SUDOERS_FILE"; then
+        log_info "✓ File contains inventory collector"
     else
-        log_error "File does not contain uname command"
-        ((errors++))
+        log_error "File does not contain inventory collector"
+        errors=$((errors + 1))
+    fi
+
+    local owner
+    owner=$(stat -c %U:%G "$SUDOERS_FILE")
+    if [ "$owner" = "root:root" ]; then
+        log_info "✓ Ownership correct (root:root)"
+    else
+        log_error "Ownership is $owner (expected root:root)"
+        errors=$((errors + 1))
     fi
     
-    # Validate syntax one more time (if visudo available)
-    if [ "$HAVE_VISUDO" = true ]; then
-        if visudo -c -f "$SUDOERS_FILE" &>/dev/null; then
-            log_info "✓ Sudoers syntax valid"
-        else
-            log_error "Sudoers syntax invalid"
-            ((errors++))
-        fi
+    if visudo -c -f "$SUDOERS_FILE" &>/dev/null; then
+        log_info "✓ Sudoers syntax valid"
     else
-        log_warn "✓ Syntax validation skipped (visudo not available)"
+        log_error "Sudoers syntax invalid"
+        errors=$((errors + 1))
     fi
     
     return $errors
@@ -321,10 +329,10 @@ display_test_instructions() {
     echo ""
     echo "To test Phase 1 sudoers configuration:"
     echo ""
-    echo "  # Test uname command (should work):"
-    echo "  sudo -u ai-auditor sudo /usr/bin/uname -a"
+    echo "  # Test inventory collector (should emit JSON):"
+    echo "  sudo -u ai-auditor sudo -n /usr/local/libexec/ai-auditor-inventory"
     echo ""
-    echo "  # Expected output: Linux [hostname] [version] ..."
+    echo "  # Expected output: one JSON inventory document"
     echo ""
     echo "  # Test denied command (should fail):"
     echo "  sudo -u ai-auditor sudo /bin/ls /root"
