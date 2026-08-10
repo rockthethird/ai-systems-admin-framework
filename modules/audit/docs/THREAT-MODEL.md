@@ -20,6 +20,7 @@ Docker is a separate boundary. Membership in the Docker socket group or unrestri
 - Root ownership and non-writable installed collector/sudoers paths
 - Absolute child executable paths and a fixed environment
 - Closed stdin, per-command timeout, isolated process group, and bounded stdout/stderr capture
+- Child CPU-time, open-file, output-file, and core-dump resource limits
 - Bounded item counts and truncated error text in JSON
 - Candidate validation followed by atomic activation
 - Positive inventory and negative arbitrary-command deployment checks
@@ -28,7 +29,7 @@ Docker is a separate boundary. Membership in the Docker socket group or unrestri
 
 - Root executes Python and several OS utilities, so vulnerabilities in those trusted components remain in scope.
 - Inventory exposes account, network, package, service, filesystem, and possibly container metadata.
-- A timeout/output cap limits collector resource consumption but is not a complete CPU, memory, syscall, or filesystem sandbox.
+- Resource limits reduce common denial-of-service paths but are not a complete memory, process-count, syscall, or filesystem sandbox. In particular, process-count limits are not relied upon for UID 0.
 - Local sudo logging is not tamper-resistant against a compromised root host.
 - SSH restrictions, sudo policy, and collector behavior have not yet been validated across a supported distribution matrix.
 - The framework does not yet implement findings, drill-down authorization, report signing, remediation, or human approval workflows.

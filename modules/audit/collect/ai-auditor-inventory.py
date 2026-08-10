@@ -7,6 +7,7 @@ import json
 import os
 import platform
 import pwd
+import resource
 import subprocess
 import selectors
 import signal
@@ -20,11 +21,22 @@ SCHEMA_VERSION = "1.0"
 COMMAND_TIMEOUT_SECONDS = 10
 MAX_LINES = 5000
 MAX_STREAM_BYTES = 1024 * 1024
+MAX_CPU_SECONDS = 5
+MAX_OPEN_FILES = 256
+MAX_FILE_BYTES = 1024 * 1024
 SAFE_ENV = {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C", "LC_ALL": "C"}
 
 
 def unavailable(error: str = "command not found") -> dict[str, Any]:
     return {"available": False, "items": [], "truncated": False, "exit_code": None, "error": error}
+
+
+def limit_child_resources() -> None:
+    """Apply conservative limits in the child immediately before exec."""
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    resource.setrlimit(resource.RLIMIT_CPU, (MAX_CPU_SECONDS, MAX_CPU_SECONDS))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_FILE_BYTES, MAX_FILE_BYTES))
+    resource.setrlimit(resource.RLIMIT_NOFILE, (MAX_OPEN_FILES, MAX_OPEN_FILES))
 
 
 def run(command: list[str], max_lines: int = MAX_LINES) -> dict[str, Any]:
@@ -44,6 +56,7 @@ def run(command: list[str], max_lines: int = MAX_LINES) -> dict[str, Any]:
         process = subprocess.Popen(
             command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, env=SAFE_ENV, start_new_session=True,
+            preexec_fn=limit_child_resources,
         )
         assert process.stdout is not None and process.stderr is not None
         selector.register(process.stdout, selectors.EVENT_READ, "stdout")
@@ -129,7 +142,11 @@ def main() -> None:
     inventory = {
         "schema_version": SCHEMA_VERSION, "collected_at": datetime.now(timezone.utc).isoformat(),
         "limits": {"command_timeout_seconds": COMMAND_TIMEOUT_SECONDS,
-                   "max_items_per_command": MAX_LINES, "max_bytes_per_stream": MAX_STREAM_BYTES},
+                   "max_items_per_command": MAX_LINES,
+                   "max_bytes_per_stream": MAX_STREAM_BYTES,
+                   "max_cpu_seconds": MAX_CPU_SECONDS,
+                   "max_open_files": MAX_OPEN_FILES,
+                   "max_file_bytes": MAX_FILE_BYTES},
         "host": {"hostname": platform.node(), "kernel": platform.release(), "architecture": platform.machine(),
                  "os_release": read_os_release(), "uptime": first_available([["/usr/bin/uptime", "-p"], ["/bin/uptime", "-p"]], 10)},
         "filesystems": first_available([["/usr/bin/df", "-P", "-T"], ["/bin/df", "-P", "-T"]]),

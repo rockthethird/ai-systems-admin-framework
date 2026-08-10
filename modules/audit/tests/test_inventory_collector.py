@@ -2,6 +2,7 @@
 """Failure-mode tests for the privileged inventory command runner."""
 
 import importlib.util
+import json
 import tempfile
 from pathlib import Path
 
@@ -39,6 +40,21 @@ def main() -> None:
             module.COMMAND_TIMEOUT_SECONDS = original_timeout
         assert result["available"]
         assert result["error"] == "command timed out"
+
+        limits = module.run([
+            "/usr/bin/python3", "-c",
+            "import json,resource; print(json.dumps({"
+            "'core':resource.getrlimit(resource.RLIMIT_CORE),"
+            "'cpu':resource.getrlimit(resource.RLIMIT_CPU),"
+            "'file':resource.getrlimit(resource.RLIMIT_FSIZE),"
+            "'nofile':resource.getrlimit(resource.RLIMIT_NOFILE)}))",
+        ])
+        assert limits["exit_code"] == 0
+        observed = json.loads(limits["items"][0])
+        assert observed["core"] == [0, 0]
+        assert observed["cpu"] == [module.MAX_CPU_SECONDS] * 2
+        assert observed["file"] == [module.MAX_FILE_BYTES] * 2
+        assert observed["nofile"] == [module.MAX_OPEN_FILES] * 2
 
     print("inventory collector boundary tests passed")
 
