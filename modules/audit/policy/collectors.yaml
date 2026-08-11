@@ -1,0 +1,58 @@
+version: ai-auditor-collectors/v1
+
+defaults:
+  command_timeout_seconds: 10
+  max_items: 5000
+  max_stream_bytes: 1048576
+  max_cpu_seconds: 5
+  max_open_files: 256
+  max_file_bytes: 1048576
+
+collectors:
+  - id: filesystems
+    type: command
+    candidates:
+      - path: /usr/bin/df
+        args: [-P, -T]
+      - path: /bin/df
+        args: [-P, -T]
+    parser: lines
+
+  - id: systemd-failed-units
+    type: command
+    candidates:
+      - path: /usr/bin/systemctl
+        args: [--no-pager, --plain, --failed]
+      - path: /bin/systemctl
+        args: [--no-pager, --plain, --failed]
+    parser: lines
+
+  - id: accounts
+    type: builtin
+    primitive: passwd-entries
+
+  - id: ssh-effective-settings
+    type: builtin
+    primitive: ssh-effective-settings
+    parameters:
+      users: [ai-auditor-cloud, ai-auditor-local]
+      settings:
+        - passwordauthentication
+        - kbdinteractiveauthentication
+        - pubkeyauthentication
+        - permitrootlogin
+
+  - id: auditor-account-paths
+    type: builtin
+    primitive: account-path-metadata
+    parameters:
+      users: [ai-auditor-cloud, ai-auditor-local]
+      relative_paths: [.ssh/authorized_keys]
+
+  - id: report-endpoints
+    type: builtin
+    primitive: path-metadata
+    parameters:
+      paths:
+        - /usr/local/libexec/ai-auditor-report
+        - /usr/local/libexec/ai-auditor-report-internal

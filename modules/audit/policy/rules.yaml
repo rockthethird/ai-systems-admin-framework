@@ -1,0 +1,110 @@
+version: ai-auditor-rules/v1
+
+rules:
+  - id: AIA-1001
+    control: filesystem-utilization
+    title: Filesystem utilization is at or above 90%
+    severity: high
+    category: capacity
+    source: filesystems
+    evaluator: filesystem-threshold
+    passed: Filesystem utilization remains below 90%
+    rationale: Very high filesystem utilization can exhaust write capacity unexpectedly.
+    impact: Services may fail to write state, logs, or temporary data.
+    recommendation: Confirm growth and retention expectations, then reclaim or add capacity through an approved maintenance workflow.
+
+  - id: AIA-1002
+    control: systemd-failed-units
+    title: Systemd reports failed units
+    severity: medium
+    category: service-health
+    source: systemd-failed-units
+    evaluator: systemd-failed-units
+    passed: Systemd reports no failed units
+    rationale: Failed units indicate services that did not reach their requested state.
+    impact: Required host functionality may be unavailable or degraded.
+    recommendation: Confirm whether each unit is required, then inspect status and logs through an approved drill-down collector.
+
+  - id: AIA-1003
+    control: additional-uid-zero-accounts
+    title: Additional accounts have UID 0
+    severity: critical
+    category: identity
+    source: accounts
+    evaluator: additional-uid-zero-accounts
+    passed: No additional UID 0 accounts were found
+    rationale: UID 0 accounts have root-equivalent operating-system authority.
+    impact: Unexpected credentials for these accounts can provide unrestricted host access.
+    recommendation: Verify each account's ownership and necessity, then remove or reassign unexpected UID 0 identities through an approved workflow.
+
+  - id: AIA-1004
+    control: inventory-completeness
+    title: Inventory collection was incomplete
+    severity: low
+    category: evidence-quality
+    source: all-required-collectors
+    evaluator: inventory-completeness
+    passed: Required inventory collection completed
+    rationale: Missing, failed, or truncated collectors reduce the completeness of the audit evidence.
+    impact: Other findings may be absent or have lower confidence.
+    recommendation: Review collector errors and platform dependencies before treating the audit as complete.
+
+  - id: AIA-1101
+    control: ssh-password-authentication
+    title: SSH permits password-capable authentication
+    severity: high
+    category: access-control
+    source: ssh-effective-settings
+    evaluator: ssh-password-authentication
+    passed: SSH password authentication is disabled for auditor identities
+    rationale: Password-capable SSH authentication expands the remote credential attack surface.
+    impact: Guessed, reused, or disclosed passwords may permit remote access.
+    recommendation: Disable password and keyboard-interactive authentication for auditor identities after validating key access.
+
+  - id: AIA-1102
+    control: ssh-root-login
+    title: SSH permits direct root login
+    severity: medium
+    category: access-control
+    source: ssh-effective-settings
+    evaluator: ssh-root-login
+    passed: Direct SSH root login is disabled
+    rationale: Direct root SSH authentication bypasses attribution through a named administrative account.
+    impact: A compromised root credential provides immediate unrestricted host authority.
+    recommendation: Set PermitRootLogin to no after validating an alternate administrative recovery path.
+
+  - id: AIA-1103
+    control: auditor-interactive-shell
+    title: Auditor identities have interactive shells
+    severity: medium
+    category: access-control
+    source: auditor-account-paths
+    evaluator: auditor-interactive-shell
+    passed: Auditor identities use non-interactive shells
+    rationale: An interactive shell increases the impact of an SSH command-boundary failure.
+    impact: A compromised auditor credential may gain a general-purpose command environment.
+    recommendation: Use a non-interactive shell together with an SSH forced command for report-only identities.
+
+  - id: AIA-1104
+    control: report-endpoint-integrity
+    title: Report endpoint integrity is not enforced
+    severity: critical
+    category: privilege-boundary
+    source: report-endpoints
+    evaluator: report-endpoint-integrity
+    passed: Report endpoints are owned by root and not writable by other users
+    rationale: The sudo boundary trusts fixed report endpoint files executed as root.
+    impact: Modification of an endpoint can turn the narrow sudo capability into arbitrary root execution.
+    recommendation: Install every endpoint as root-owned and remove group and other write permissions.
+
+  - id: AIA-1105
+    control: auditor-path-permissions
+    title: Auditor account paths have unsafe permissions
+    severity: high
+    category: file-integrity
+    source: auditor-account-paths
+    evaluator: auditor-path-permissions
+    passed: Auditor homes and authorized_keys have restrictive ownership and modes
+    rationale: Writable account homes or key files can let another identity alter SSH authentication behavior.
+    impact: An attacker may replace trusted keys or influence the report identity's login environment.
+    recommendation: Restore account ownership and remove group or other write access; restrict authorized_keys to its owner.

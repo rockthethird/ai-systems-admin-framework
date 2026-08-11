@@ -1,0 +1,298 @@
+{
+  "collectors": {
+    "collectors": [
+      {
+        "candidates": [
+          {
+            "args": [
+              "-P",
+              "-T"
+            ],
+            "path": "/usr/bin/df"
+          },
+          {
+            "args": [
+              "-P",
+              "-T"
+            ],
+            "path": "/bin/df"
+          }
+        ],
+        "id": "filesystems",
+        "parser": "lines",
+        "type": "command"
+      },
+      {
+        "candidates": [
+          {
+            "args": [
+              "--no-pager",
+              "--plain",
+              "--failed"
+            ],
+            "path": "/usr/bin/systemctl"
+          },
+          {
+            "args": [
+              "--no-pager",
+              "--plain",
+              "--failed"
+            ],
+            "path": "/bin/systemctl"
+          }
+        ],
+        "id": "systemd-failed-units",
+        "parser": "lines",
+        "type": "command"
+      },
+      {
+        "id": "accounts",
+        "primitive": "passwd-entries",
+        "type": "builtin"
+      },
+      {
+        "id": "ssh-effective-settings",
+        "parameters": {
+          "settings": [
+            "passwordauthentication",
+            "kbdinteractiveauthentication",
+            "pubkeyauthentication",
+            "permitrootlogin"
+          ],
+          "users": [
+            "ai-auditor-cloud",
+            "ai-auditor-local"
+          ]
+        },
+        "primitive": "ssh-effective-settings",
+        "type": "builtin"
+      },
+      {
+        "id": "auditor-account-paths",
+        "parameters": {
+          "relative_paths": [
+            ".ssh/authorized_keys"
+          ],
+          "users": [
+            "ai-auditor-cloud",
+            "ai-auditor-local"
+          ]
+        },
+        "primitive": "account-path-metadata",
+        "type": "builtin"
+      },
+      {
+        "id": "report-endpoints",
+        "parameters": {
+          "paths": [
+            "/usr/local/libexec/ai-auditor-report",
+            "/usr/local/libexec/ai-auditor-report-internal"
+          ]
+        },
+        "primitive": "path-metadata",
+        "type": "builtin"
+      }
+    ],
+    "defaults": {
+      "command_timeout_seconds": 10,
+      "max_cpu_seconds": 5,
+      "max_file_bytes": 1048576,
+      "max_items": 5000,
+      "max_open_files": 256,
+      "max_stream_bytes": 1048576
+    },
+    "version": "ai-auditor-collectors/v1"
+  },
+  "identities": {
+    "identities": [
+      {
+        "arguments": "none",
+        "endpoint": "/usr/local/libexec/ai-auditor-report",
+        "profile": "external-safe/v1",
+        "user": "ai-auditor-cloud"
+      },
+      {
+        "arguments": "none",
+        "endpoint": "/usr/local/libexec/ai-auditor-report-internal",
+        "profile": "internal-rich/v1",
+        "user": "ai-auditor-local"
+      }
+    ],
+    "version": "ai-auditor-identities/v1"
+  },
+  "profiles": {
+    "profiles": [
+      {
+        "evidence": "count-and-section",
+        "exclude": [
+          "raw-inventory",
+          "host-identity",
+          "collection-timestamps",
+          "evidence-paths",
+          "evidence-values",
+          "raw-errors"
+        ],
+        "id": "external-safe/v1",
+        "include": [
+          "rule-metadata",
+          "assessment-status",
+          "severity-summary",
+          "evidence-counts",
+          "evidence-sections",
+          "content-hashes"
+        ],
+        "schema": "ai-auditor-external-findings/v1"
+      },
+      {
+        "evidence": "approved-internal-summary",
+        "exclude": [
+          "raw-inventory",
+          "raw-evidence-values",
+          "raw-errors",
+          "unrelated-inventory"
+        ],
+        "id": "internal-rich/v1",
+        "include": [
+          "rule-metadata",
+          "assessment-status",
+          "severity-summary",
+          "host-identity",
+          "collection-timestamps",
+          "approved-evidence-summaries",
+          "content-hashes"
+        ],
+        "schema": "ai-auditor-internal-findings/v1"
+      }
+    ],
+    "version": "ai-auditor-profiles/v1"
+  },
+  "rules": {
+    "rules": [
+      {
+        "category": "capacity",
+        "control": "filesystem-utilization",
+        "evaluator": "filesystem-threshold",
+        "id": "AIA-1001",
+        "impact": "Services may fail to write state, logs, or temporary data.",
+        "passed": "Filesystem utilization remains below 90%",
+        "rationale": "Very high filesystem utilization can exhaust write capacity unexpectedly.",
+        "recommendation": "Confirm growth and retention expectations, then reclaim or add capacity through an approved maintenance workflow.",
+        "severity": "high",
+        "source": "filesystems",
+        "title": "Filesystem utilization is at or above 90%"
+      },
+      {
+        "category": "service-health",
+        "control": "systemd-failed-units",
+        "evaluator": "systemd-failed-units",
+        "id": "AIA-1002",
+        "impact": "Required host functionality may be unavailable or degraded.",
+        "passed": "Systemd reports no failed units",
+        "rationale": "Failed units indicate services that did not reach their requested state.",
+        "recommendation": "Confirm whether each unit is required, then inspect status and logs through an approved drill-down collector.",
+        "severity": "medium",
+        "source": "systemd-failed-units",
+        "title": "Systemd reports failed units"
+      },
+      {
+        "category": "identity",
+        "control": "additional-uid-zero-accounts",
+        "evaluator": "additional-uid-zero-accounts",
+        "id": "AIA-1003",
+        "impact": "Unexpected credentials for these accounts can provide unrestricted host access.",
+        "passed": "No additional UID 0 accounts were found",
+        "rationale": "UID 0 accounts have root-equivalent operating-system authority.",
+        "recommendation": "Verify each account's ownership and necessity, then remove or reassign unexpected UID 0 identities through an approved workflow.",
+        "severity": "critical",
+        "source": "accounts",
+        "title": "Additional accounts have UID 0"
+      },
+      {
+        "category": "evidence-quality",
+        "control": "inventory-completeness",
+        "evaluator": "inventory-completeness",
+        "id": "AIA-1004",
+        "impact": "Other findings may be absent or have lower confidence.",
+        "passed": "Required inventory collection completed",
+        "rationale": "Missing, failed, or truncated collectors reduce the completeness of the audit evidence.",
+        "recommendation": "Review collector errors and platform dependencies before treating the audit as complete.",
+        "severity": "low",
+        "source": "all-required-collectors",
+        "title": "Inventory collection was incomplete"
+      },
+      {
+        "category": "access-control",
+        "control": "ssh-password-authentication",
+        "evaluator": "ssh-password-authentication",
+        "id": "AIA-1101",
+        "impact": "Guessed, reused, or disclosed passwords may permit remote access.",
+        "passed": "SSH password authentication is disabled for auditor identities",
+        "rationale": "Password-capable SSH authentication expands the remote credential attack surface.",
+        "recommendation": "Disable password and keyboard-interactive authentication for auditor identities after validating key access.",
+        "severity": "high",
+        "source": "ssh-effective-settings",
+        "title": "SSH permits password-capable authentication"
+      },
+      {
+        "category": "access-control",
+        "control": "ssh-root-login",
+        "evaluator": "ssh-root-login",
+        "id": "AIA-1102",
+        "impact": "A compromised root credential provides immediate unrestricted host authority.",
+        "passed": "Direct SSH root login is disabled",
+        "rationale": "Direct root SSH authentication bypasses attribution through a named administrative account.",
+        "recommendation": "Set PermitRootLogin to no after validating an alternate administrative recovery path.",
+        "severity": "medium",
+        "source": "ssh-effective-settings",
+        "title": "SSH permits direct root login"
+      },
+      {
+        "category": "access-control",
+        "control": "auditor-interactive-shell",
+        "evaluator": "auditor-interactive-shell",
+        "id": "AIA-1103",
+        "impact": "A compromised auditor credential may gain a general-purpose command environment.",
+        "passed": "Auditor identities use non-interactive shells",
+        "rationale": "An interactive shell increases the impact of an SSH command-boundary failure.",
+        "recommendation": "Use a non-interactive shell together with an SSH forced command for report-only identities.",
+        "severity": "medium",
+        "source": "auditor-account-paths",
+        "title": "Auditor identities have interactive shells"
+      },
+      {
+        "category": "privilege-boundary",
+        "control": "report-endpoint-integrity",
+        "evaluator": "report-endpoint-integrity",
+        "id": "AIA-1104",
+        "impact": "Modification of an endpoint can turn the narrow sudo capability into arbitrary root execution.",
+        "passed": "Report endpoints are owned by root and not writable by other users",
+        "rationale": "The sudo boundary trusts fixed report endpoint files executed as root.",
+        "recommendation": "Install every endpoint as root-owned and remove group and other write permissions.",
+        "severity": "critical",
+        "source": "report-endpoints",
+        "title": "Report endpoint integrity is not enforced"
+      },
+      {
+        "category": "file-integrity",
+        "control": "auditor-path-permissions",
+        "evaluator": "auditor-path-permissions",
+        "id": "AIA-1105",
+        "impact": "An attacker may replace trusted keys or influence the report identity's login environment.",
+        "passed": "Auditor homes and authorized_keys have restrictive ownership and modes",
+        "rationale": "Writable account homes or key files can let another identity alter SSH authentication behavior.",
+        "recommendation": "Restore account ownership and remove group or other write access; restrict authorized_keys to its owner.",
+        "severity": "high",
+        "source": "auditor-account-paths",
+        "title": "Auditor account paths have unsafe permissions"
+      }
+    ],
+    "version": "ai-auditor-rules/v1"
+  },
+  "source_sha256": {
+    "collectors.yaml": "e347eca7ac1deea3c69bf0c625bfde4a2a344f224d6d7e7602ea68e13db5bc4c",
+    "identities.yaml": "f8144e9c3bdc602fcfd15b510f18580c30571cbf9396655ab99b5c940add1234",
+    "profiles.yaml": "ed7d839ce133b90139dfd2b925c94ddd982ca8c466202db3c39a320a6404e379",
+    "rules.yaml": "47a65886d33d443369f73a023768fd1f7669de97266b34dfddb59cabd9a52f47"
+  },
+  "version": "ai-auditor-policy-manifest/v1"
+}

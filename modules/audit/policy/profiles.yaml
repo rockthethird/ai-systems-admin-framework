@@ -1,0 +1,37 @@
+version: ai-auditor-profiles/v1
+
+profiles:
+  - id: external-safe/v1
+    schema: ai-auditor-external-findings/v1
+    evidence: count-and-section
+    include:
+      - rule-metadata
+      - assessment-status
+      - severity-summary
+      - evidence-counts
+      - evidence-sections
+      - content-hashes
+    exclude:
+      - raw-inventory
+      - host-identity
+      - collection-timestamps
+      - evidence-paths
+      - evidence-values
+      - raw-errors
+
+  - id: internal-rich/v1
+    schema: ai-auditor-internal-findings/v1
+    evidence: approved-internal-summary
+    include:
+      - rule-metadata
+      - assessment-status
+      - severity-summary
+      - host-identity
+      - collection-timestamps
+      - approved-evidence-summaries
+      - content-hashes
+    exclude:
+      - raw-inventory
+      - raw-evidence-values
+      - raw-errors
+      - unrelated-inventory

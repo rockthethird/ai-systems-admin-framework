@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["version", "profiles"],
+  "properties": {
+    "version": {"const": "ai-auditor-profiles/v1"},
+    "profiles": {"type": "array", "minItems": 1, "items": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "schema", "evidence", "include", "exclude"],
+      "properties": {
+        "id": {"enum": ["external-safe/v1", "internal-rich/v1"]},
+        "schema": {"enum": ["ai-auditor-external-findings/v1", "ai-auditor-internal-findings/v1"]},
+        "evidence": {"enum": ["count-and-section", "approved-internal-summary"]},
+        "include": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}},
+        "exclude": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}}
+      }
+    }}
+  }
+}
