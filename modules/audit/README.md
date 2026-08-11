@@ -8,6 +8,11 @@ The module creates separate locked `ai-auditor-cloud` and `ai-auditor-local` ide
 
 The report includes explicit passed, failed, and unknown outcomes for nine deterministic controls, including effective SSH policy and the integrity of the report access boundary. Adaptive drill-down and remediation are not implemented. The module is alpha software and is not production-ready.
 
+Human review starts in [`policy/`](policy/). Focused YAML files define current
+collectors, controls, disclosure profiles, and identity bindings; strict schemas
+compile them into a checked-in manifest used by the reporting runtime. See
+[`ARCHITECTURE-DECLARATIVE-POLICY.md`](docs/ARCHITECTURE-DECLARATIVE-POLICY.md).
+
 ## Security model
 
 - Broad discovery is implemented inside one root-only, fixed collector.
@@ -31,6 +36,8 @@ bash modules/audit/tests/test-findings-schema.sh
 bash modules/audit/tests/test-inventory-analysis.sh
 bash modules/audit/tests/test-external-findings-sanitization.sh
 bash modules/audit/tests/test-internal-findings-sanitization.sh
+bash modules/audit/tests/test-policy-compilation.sh
+bash modules/audit/tests/test-policy-review-surface.sh
 
 # On a disposable target, from the repository root
 sudo bash modules/audit/deploy/12-create-report-identities.sh
@@ -48,9 +55,10 @@ SSH key setup and SSH hardening are separate steps; see [deploy/README.md](deplo
 ## Next milestones
 
 1. Repeat end-to-end deployment and denial testing on supported Linux distributions.
-2. Bind separate SSH credentials and forced commands to the cloud and local report identities.
-3. Exercise the external-safe report wrapper through Hermes without exposing raw inventory.
-4. Add drill-down collectors only when real audits identify missing evidence.
-5. Add centralized, tamper-resistant logging before making stronger auditability claims.
+2. Move fixed commands and collector limits behind the validated collector policy.
+3. Generate sudoers from identity policy, then bind separate SSH credentials and forced commands.
+4. Exercise the external-safe report wrapper through Hermes without exposing raw inventory.
+5. Add drill-down collectors only when real audits identify missing evidence.
+6. Add centralized, tamper-resistant logging before making stronger auditability claims.
 
 The local and external-safe report contracts are documented in [reporting/README.md](reporting/README.md).

@@ -34,6 +34,8 @@ The AI is not trusted as a system administrator. It may analyze broad evidence, 
 - `modules/audit/reporting/ai-auditor-report.sh` is the installed AI-facing endpoint. It creates root-only temporary evidence, calls the private collector/analyzer/sanitizer chain, emits only external-safe JSON, and removes intermediate artifacts on exit.
 - `modules/audit/reporting/ai-auditor-report-internal.sh` emits `internal-rich/v1` for a local model, including exact host identity and constrained finding-relevant evidence labeled as untrusted.
 - `modules/audit/deploy/12-create-report-identities.sh` creates locked `ai-auditor-cloud` and `ai-auditor-local` identities without installing SSH keys. Sudo binds each identity to only its matching fixed endpoint; SSH binding is deliberately deferred for design review.
+- `modules/audit/policy/` is now the primary human-review surface for collectors, rules, disclosure profiles, and identity bindings. Strict schemas and `build/compile-policy.py` produce a deterministic checked-in manifest; YAML cannot contain shell fragments or arbitrary expressions.
+- The analyzer and both sanitizers load public control definitions from that root-owned manifest. Shared fail-closed validation removes duplicated rule text and coverage logic while profile-specific evidence reduction remains explicit.
 
 ## Validation completed
 
@@ -56,6 +58,8 @@ The original raw collector boundary passed end-to-end deployment inside a dispos
 
 The expanded nine-rule endpoint was deployed on 2026-08-11. Both profiles reported six passed and three failed controls with no unknowns. The live failures were password-capable SSH authentication, direct root SSH login, and interactive shells for the two report identities. Endpoint ownership and auditor path permissions passed. External-safe leakage checks and cross-profile/raw-collector denial checks also passed.
 
+The declarative-policy reporting migration was then deployed with semantic before/after comparison. After removing only per-run hashes and collection timestamps, both external-safe and internal-rich JSON were identical. All policy compilation, stale-artifact, duplicate-ID, weakened-disclosure, review-surface, reporting, collector, schema, and sudoers tests passed.
+
 ## Hermes review
 
 The live Hermes gateway was queried through its configured free model using only a generic architecture description; private repository contents were not sent to the external Nous Portal. Its review helped identify the need for explicit no-argument sudoers matching and defense-in-depth argument rejection. It also recommended future resource-limit and syscall-level testing.
@@ -66,8 +70,9 @@ Hermes currently runs on the audited host with direct Docker and SSH paths only 
 
 1. Repeat end-to-end deployment on additional supported distributions and future remote targets.
 2. Repeat the fixed-command syscall trace on the target VM, including its real systemd and optional Docker paths.
-3. Decide and implement the SSH forced-command and key-binding design, then remediate the three intentionally exposed pre-binding findings.
-4. Add narrow drill-down collectors only when real audit evidence demonstrates a need.
-5. Add centralized, tamper-resistant logging before making complete-auditability claims.
+3. Move fixed command definitions and hard-coded collector limits behind the validated collector policy while retaining resource ceilings in trusted code.
+4. Generate sudoers from identity policy, then decide and implement SSH forced-command and key binding.
+5. Add narrow drill-down collectors only when real audit evidence demonstrates a need.
+6. Add centralized, tamper-resistant logging before making complete-auditability claims.
 
 The patch archive `ai-auditor-changes-2026-08-10.patch` predates these changes and must not be applied over the current tree.
