@@ -8,6 +8,12 @@ This directory defines two unprivileged output boundaries:
 
 Producing either report grants no execution or remediation authority.
 
+Rule text, control metadata, collector dependencies, and profile selection are
+defined in `../policy/`. The reporting runtime reads the prevalidated
+`../generated/policy-manifest.json`; it does not duplicate public rule text.
+Run `python3 ../build/compile-policy.py --check` to verify that the committed
+manifest matches its YAML sources.
+
 Version 1 records:
 
 - inventory provenance and an optional SHA-256 digest,
@@ -74,6 +80,8 @@ bash modules/audit/tests/test-findings-schema.sh
 bash modules/audit/tests/test-inventory-analysis.sh
 bash modules/audit/tests/test-external-findings-sanitization.sh
 bash modules/audit/tests/test-internal-findings-sanitization.sh
+bash modules/audit/tests/test-policy-compilation.sh
+bash modules/audit/tests/test-policy-review-surface.sh
 ```
 
 Generate an initial deterministic report without elevated privileges:

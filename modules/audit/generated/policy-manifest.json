@@ -177,6 +177,7 @@
         "passed": "Filesystem utilization remains below 90%",
         "rationale": "Very high filesystem utilization can exhaust write capacity unexpectedly.",
         "recommendation": "Confirm growth and retention expectations, then reclaim or add capacity through an approved maintenance workflow.",
+        "section": "filesystems",
         "severity": "high",
         "source": "filesystems",
         "title": "Filesystem utilization is at or above 90%"
@@ -190,6 +191,7 @@
         "passed": "Systemd reports no failed units",
         "rationale": "Failed units indicate services that did not reach their requested state.",
         "recommendation": "Confirm whether each unit is required, then inspect status and logs through an approved drill-down collector.",
+        "section": "systemd.failed_units",
         "severity": "medium",
         "source": "systemd-failed-units",
         "title": "Systemd reports failed units"
@@ -203,6 +205,7 @@
         "passed": "No additional UID 0 accounts were found",
         "rationale": "UID 0 accounts have root-equivalent operating-system authority.",
         "recommendation": "Verify each account's ownership and necessity, then remove or reassign unexpected UID 0 identities through an approved workflow.",
+        "section": "accounts",
         "severity": "critical",
         "source": "accounts",
         "title": "Additional accounts have UID 0"
@@ -216,6 +219,7 @@
         "passed": "Required inventory collection completed",
         "rationale": "Missing, failed, or truncated collectors reduce the completeness of the audit evidence.",
         "recommendation": "Review collector errors and platform dependencies before treating the audit as complete.",
+        "section": "collection",
         "severity": "low",
         "source": "all-required-collectors",
         "title": "Inventory collection was incomplete"
@@ -229,6 +233,7 @@
         "passed": "SSH password authentication is disabled for auditor identities",
         "rationale": "Password-capable SSH authentication expands the remote credential attack surface.",
         "recommendation": "Disable password and keyboard-interactive authentication for auditor identities after validating key access.",
+        "section": "security.ssh",
         "severity": "high",
         "source": "ssh-effective-settings",
         "title": "SSH permits password-capable authentication"
@@ -242,6 +247,7 @@
         "passed": "Direct SSH root login is disabled",
         "rationale": "Direct root SSH authentication bypasses attribution through a named administrative account.",
         "recommendation": "Set PermitRootLogin to no after validating an alternate administrative recovery path.",
+        "section": "security.ssh",
         "severity": "medium",
         "source": "ssh-effective-settings",
         "title": "SSH permits direct root login"
@@ -255,6 +261,7 @@
         "passed": "Auditor identities use non-interactive shells",
         "rationale": "An interactive shell increases the impact of an SSH command-boundary failure.",
         "recommendation": "Use a non-interactive shell together with an SSH forced command for report-only identities.",
+        "section": "security.auditor_accounts",
         "severity": "medium",
         "source": "auditor-account-paths",
         "title": "Auditor identities have interactive shells"
@@ -268,6 +275,7 @@
         "passed": "Report endpoints are owned by root and not writable by other users",
         "rationale": "The sudo boundary trusts fixed report endpoint files executed as root.",
         "recommendation": "Install every endpoint as root-owned and remove group and other write permissions.",
+        "section": "security.report_endpoints",
         "severity": "critical",
         "source": "report-endpoints",
         "title": "Report endpoint integrity is not enforced"
@@ -281,6 +289,7 @@
         "passed": "Auditor homes and authorized_keys have restrictive ownership and modes",
         "rationale": "Writable account homes or key files can let another identity alter SSH authentication behavior.",
         "recommendation": "Restore account ownership and remove group or other write access; restrict authorized_keys to its owner.",
+        "section": "security.auditor_accounts",
         "severity": "high",
         "source": "auditor-account-paths",
         "title": "Auditor account paths have unsafe permissions"
@@ -292,7 +301,7 @@
     "collectors.yaml": "e347eca7ac1deea3c69bf0c625bfde4a2a344f224d6d7e7602ea68e13db5bc4c",
     "identities.yaml": "f8144e9c3bdc602fcfd15b510f18580c30571cbf9396655ab99b5c940add1234",
     "profiles.yaml": "ed7d839ce133b90139dfd2b925c94ddd982ca8c466202db3c39a320a6404e379",
-    "rules.yaml": "47a65886d33d443369f73a023768fd1f7669de97266b34dfddb59cabd9a52f47"
+    "rules.yaml": "ea9507c742036d851315077503b3a7b3bc0dff378c154eb7756325ef7ea32b69"
   },
   "version": "ai-auditor-policy-manifest/v1"
 }

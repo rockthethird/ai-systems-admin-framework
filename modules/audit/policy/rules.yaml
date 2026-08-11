@@ -7,6 +7,7 @@ rules:
     severity: high
     category: capacity
     source: filesystems
+    section: filesystems
     evaluator: filesystem-threshold
     passed: Filesystem utilization remains below 90%
     rationale: Very high filesystem utilization can exhaust write capacity unexpectedly.
@@ -19,6 +20,7 @@ rules:
     severity: medium
     category: service-health
     source: systemd-failed-units
+    section: systemd.failed_units
     evaluator: systemd-failed-units
     passed: Systemd reports no failed units
     rationale: Failed units indicate services that did not reach their requested state.
@@ -31,6 +33,7 @@ rules:
     severity: critical
     category: identity
     source: accounts
+    section: accounts
     evaluator: additional-uid-zero-accounts
     passed: No additional UID 0 accounts were found
     rationale: UID 0 accounts have root-equivalent operating-system authority.
@@ -43,6 +46,7 @@ rules:
     severity: low
     category: evidence-quality
     source: all-required-collectors
+    section: collection
     evaluator: inventory-completeness
     passed: Required inventory collection completed
     rationale: Missing, failed, or truncated collectors reduce the completeness of the audit evidence.
@@ -55,6 +59,7 @@ rules:
     severity: high
     category: access-control
     source: ssh-effective-settings
+    section: security.ssh
     evaluator: ssh-password-authentication
     passed: SSH password authentication is disabled for auditor identities
     rationale: Password-capable SSH authentication expands the remote credential attack surface.
@@ -67,6 +72,7 @@ rules:
     severity: medium
     category: access-control
     source: ssh-effective-settings
+    section: security.ssh
     evaluator: ssh-root-login
     passed: Direct SSH root login is disabled
     rationale: Direct root SSH authentication bypasses attribution through a named administrative account.
@@ -79,6 +85,7 @@ rules:
     severity: medium
     category: access-control
     source: auditor-account-paths
+    section: security.auditor_accounts
     evaluator: auditor-interactive-shell
     passed: Auditor identities use non-interactive shells
     rationale: An interactive shell increases the impact of an SSH command-boundary failure.
@@ -91,6 +98,7 @@ rules:
     severity: critical
     category: privilege-boundary
     source: report-endpoints
+    section: security.report_endpoints
     evaluator: report-endpoint-integrity
     passed: Report endpoints are owned by root and not writable by other users
     rationale: The sudo boundary trusts fixed report endpoint files executed as root.
@@ -103,6 +111,7 @@ rules:
     severity: high
     category: file-integrity
     source: auditor-account-paths
+    section: security.auditor_accounts
     evaluator: auditor-path-permissions
     passed: Auditor homes and authorized_keys have restrictive ownership and modes
     rationale: Writable account homes or key files can let another identity alter SSH authentication behavior.

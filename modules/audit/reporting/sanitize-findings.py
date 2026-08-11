@@ -10,105 +10,26 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from audit_policy import PROFILES, RULES
+from sanitize_common import require, sanitize_findings
+
 INPUT_SCHEMA = "ai-auditor-findings/v1"
-OUTPUT_SCHEMA = "ai-auditor-external-findings/v1"
 PROFILE = "external-safe/v1"
+PROFILE_POLICY = PROFILES[PROFILE]
+OUTPUT_SCHEMA = PROFILE_POLICY["schema"]
 TRUSTED_ENGINE = "ai-auditor-static-rules/v1"
-SEVERITIES = ("critical", "high", "medium", "low", "info")
-SAFE_SECTIONS = {
-    "accounts", "collection", "filesystems", "systemd.failed_units",
-    "security.ssh", "security.auditor_accounts", "security.report_endpoints",
-}
-
-# Public text is reconstructed rather than copied from the input report. This
-# prevents host-controlled evidence or a modified report from becoming model
-# instructions through an otherwise allowlisted string field.
-PUBLIC_RULES = {
-    "AIA-1001": {
-        "title": "Filesystem utilization is at or above 90%",
-        "severity": "high",
-        "category": "capacity",
-        "rationale": "Very high filesystem utilization can exhaust write capacity unexpectedly.",
-        "impact": "Services may fail to write state, logs, or temporary data.",
-        "recommendation": "Confirm growth and retention expectations, then reclaim or add capacity through an approved maintenance workflow.",
-    },
-    "AIA-1002": {
-        "title": "Systemd reports failed units",
-        "severity": "medium",
-        "category": "service-health",
-        "rationale": "Failed units indicate services that did not reach their requested state.",
-        "impact": "Required host functionality may be unavailable or degraded.",
-        "recommendation": "Confirm whether each unit is required, then inspect status and logs through an approved drill-down collector.",
-    },
-    "AIA-1003": {
-        "title": "Additional accounts have UID 0",
-        "severity": "critical",
-        "category": "identity",
-        "rationale": "UID 0 accounts have root-equivalent operating-system authority.",
-        "impact": "Unexpected credentials for these accounts can provide unrestricted host access.",
-        "recommendation": "Verify each account's ownership and necessity, then remove or reassign unexpected UID 0 identities through an approved workflow.",
-    },
-    "AIA-1004": {
-        "title": "Inventory collection was incomplete",
-        "severity": "low",
-        "category": "evidence-quality",
-        "rationale": "Missing, failed, or truncated collectors reduce the completeness of the audit evidence.",
-        "impact": "Other findings may be absent or have lower confidence.",
-        "recommendation": "Review collector errors and platform dependencies before treating the audit as complete.",
-    },
-    "AIA-1101": {"title": "SSH permits password-capable authentication", "severity": "high", "category": "access-control",
-        "rationale": "Password-capable SSH authentication expands the remote credential attack surface.", "impact": "Guessed, reused, or disclosed passwords may permit remote access.",
-        "recommendation": "Disable password and keyboard-interactive authentication for auditor identities after validating key access."},
-    "AIA-1102": {"title": "SSH permits direct root login", "severity": "medium", "category": "access-control",
-        "rationale": "Direct root SSH authentication bypasses attribution through a named administrative account.", "impact": "A compromised root credential provides immediate unrestricted host authority.",
-        "recommendation": "Set PermitRootLogin to no after validating an alternate administrative recovery path."},
-    "AIA-1103": {"title": "Auditor identities have interactive shells", "severity": "medium", "category": "access-control",
-        "rationale": "An interactive shell increases the impact of an SSH command-boundary failure.", "impact": "A compromised auditor credential may gain a general-purpose command environment.",
-        "recommendation": "Use a non-interactive shell together with an SSH forced command for report-only identities."},
-    "AIA-1104": {"title": "Report endpoint integrity is not enforced", "severity": "critical", "category": "privilege-boundary",
-        "rationale": "The sudo boundary trusts fixed report endpoint files executed as root.", "impact": "Modification of an endpoint can turn the narrow sudo capability into arbitrary root execution.",
-        "recommendation": "Install every endpoint as root-owned and remove group and other write permissions."},
-    "AIA-1105": {"title": "Auditor account paths have unsafe permissions", "severity": "high", "category": "file-integrity",
-        "rationale": "Writable account homes or key files can let another identity alter SSH authentication behavior.", "impact": "An attacker may replace trusted keys or influence the report identity's login environment.",
-        "recommendation": "Restore account ownership and remove group or other write access; restrict authorized_keys to its owner."},
-}
+SAFE_SECTIONS = {rule["section"] for rule in RULES.values()}
+if PROFILE_POLICY["evidence"] != "count-and-section":
+    raise ValueError("external-safe profile requires count-and-section evidence")
 
 
-def require(condition: bool, message: str) -> None:
-    if not condition:
-        raise ValueError(message)
-
-
-def sanitize_assessment(report: dict[str, Any], failed_ids: set[str]) -> dict[str, Any]:
-    assessment = report.get("assessment")
-    require(isinstance(assessment, dict), "assessment must be an object")
-    results = assessment.get("results")
-    require(isinstance(results, list) and len(results) == len(PUBLIC_RULES),
-            "assessment must cover every supported rule")
-    safe_results = []
-    seen = set()
-    counts = {status: 0 for status in ("passed", "failed", "unknown")}
-    for result in results:
-        require(isinstance(result, dict), "assessment result must be an object")
-        identifier = result.get("id")
-        require(identifier in PUBLIC_RULES and identifier not in seen,
-                f"unsupported or duplicate assessment rule: {identifier}")
-        seen.add(identifier)
-        status = result.get("status")
-        require(status in counts, f"assessment rule {identifier} has invalid status")
-        require((status == "failed") == (identifier in failed_ids),
-                f"assessment rule {identifier} disagrees with findings")
-        control = result.get("control")
-        section = result.get("section")
-        require(isinstance(control, str) and control and isinstance(section, str) and section,
-                f"assessment rule {identifier} has invalid metadata")
-        counts[status] += 1
-        safe_results.append({"id": identifier, "control": control, "section": section, "status": status})
-    require(seen == set(PUBLIC_RULES), "assessment omits supported rules")
-    require(assessment.get("rules_evaluated") == len(results) and
-            all(assessment.get(status) == count for status, count in counts.items()),
-            "assessment counts do not match results")
-    return {"rules_evaluated": len(results), **counts, "results": safe_results}
+def external_evidence(identifier: str, evidence: list[dict[str, Any]]) -> dict[str, Any]:
+    sections = set()
+    for item in evidence:
+        require(isinstance(item, dict), f"finding {identifier} has invalid evidence")
+        section = item.get("section")
+        sections.add(section if section in SAFE_SECTIONS else "other")
+    return {"observation_count": len(evidence), "sections": sorted(sections), "details": "withheld"}
 
 
 def sanitize(raw_report: bytes) -> dict[str, Any]:
@@ -116,98 +37,36 @@ def sanitize(raw_report: bytes) -> dict[str, Any]:
     require(isinstance(report, dict), "findings report must be an object")
     require(report.get("schema_version") == INPUT_SCHEMA, "unsupported findings schema_version")
     analysis = report.get("analysis")
-    require(isinstance(analysis, dict), "analysis must be an object")
-    require(analysis.get("engine") == TRUSTED_ENGINE, "external-safe profile requires the trusted static engine")
-    findings = report.get("findings")
-    require(isinstance(findings, list), "findings must be an array")
-
-    safe_findings = []
-    counts = {severity: 0 for severity in SEVERITIES}
-    withheld_items = 0
-    seen = set()
-    degraded = False
-    for item in findings:
-        require(isinstance(item, dict), "finding must be an object")
-        identifier = item.get("id")
-        require(identifier in PUBLIC_RULES, f"unsupported finding id: {identifier}")
-        require(identifier not in seen, f"duplicate finding id: {identifier}")
-        seen.add(identifier)
-        public = PUBLIC_RULES[identifier]
-        for field in ("title", "severity", "category", "rationale", "impact", "recommendation"):
-            require(item.get(field) == public[field], f"finding {identifier} has unexpected {field}")
-        status = item.get("status")
-        confidence = item.get("confidence")
-        evidence = item.get("evidence")
-        require(status in {"open", "accepted", "resolved", "not_applicable"}, f"finding {identifier} has invalid status")
-        require(isinstance(confidence, (int, float)) and not isinstance(confidence, bool) and 0 <= confidence <= 1,
-                f"finding {identifier} has invalid confidence")
-        require(isinstance(evidence, list) and evidence, f"finding {identifier} has no evidence")
-        sections = set()
-        for evidence_item in evidence:
-            require(isinstance(evidence_item, dict), f"finding {identifier} has invalid evidence")
-            section = evidence_item.get("section")
-            sections.add(section if section in SAFE_SECTIONS else "other")
-        withheld_items += len(evidence)
-        counts[public["severity"]] += 1
-        degraded = degraded or identifier == "AIA-1004"
-        safe_findings.append({
-            "id": identifier,
-            **public,
-            "status": status,
-            "confidence": confidence,
-            "evidence": {
-                "observation_count": len(evidence),
-                "sections": sorted(sections),
-                "details": "withheld",
-            },
-        })
-
-    expected_summary = {"total": len(safe_findings), **counts}
-    require(report.get("summary") == expected_summary, "findings summary does not match findings")
+    require(isinstance(analysis, dict) and analysis.get("engine") == TRUSTED_ENGINE,
+            "external-safe profile requires the trusted static engine")
+    safe_findings, summary, assessment, degraded = sanitize_findings(report, external_evidence)
     source = report.get("source")
     require(isinstance(source, dict), "source must be an object")
-    inventory_digest = source.get("inventory_sha256")
-    require(isinstance(inventory_digest, str) and len(inventory_digest) == 64 and
-            all(character in "0123456789abcdef" for character in inventory_digest),
+    digest = source.get("inventory_sha256")
+    require(isinstance(digest, str) and len(digest) == 64 and
+            all(character in "0123456789abcdef" for character in digest),
             "source inventory_sha256 is invalid")
-    safe_assessment = sanitize_assessment(report, seen)
-
     return {
-        "schema_version": OUTPUT_SCHEMA,
-        "profile": PROFILE,
-        "source": {
-            "input_schema_version": INPUT_SCHEMA,
-            "inventory_sha256": inventory_digest,
-            "findings_sha256": hashlib.sha256(raw_report).hexdigest(),
-        },
-        "disclosure": {
-            "raw_inventory_included": False,
-            "host_identifiers_included": False,
-            "collection_timestamps_included": False,
-            "evidence_paths_included": False,
-            "evidence_observations_included": False,
-            "withheld_evidence_items": withheld_items,
-        },
+        "schema_version": OUTPUT_SCHEMA, "profile": PROFILE,
+        "source": {"input_schema_version": INPUT_SCHEMA, "inventory_sha256": digest,
+                   "findings_sha256": hashlib.sha256(raw_report).hexdigest()},
+        "disclosure": {"raw_inventory_included": False, "host_identifiers_included": False,
+                       "collection_timestamps_included": False, "evidence_paths_included": False,
+                       "evidence_observations_included": False,
+                       "withheld_evidence_items": sum(len(item["evidence"]) for item in report["findings"])},
         "evidence_quality": "degraded" if degraded else "complete",
-        "analysis": {
-            "engine": TRUSTED_ENGINE,
-            "model": None,
-            "limitations": [
-                "Only deterministic rules explicitly supported by external-safe/v1 are included",
-                "Host identifiers, collection times, evidence paths, and observations are withheld",
-                "Recommendations require human review and grant no execution authority",
-            ],
-        },
-        "assessment": safe_assessment,
-        "summary": expected_summary,
-        "findings": safe_findings,
+        "analysis": {"engine": TRUSTED_ENGINE, "model": None, "limitations": [
+            "Only deterministic rules explicitly supported by external-safe/v1 are included",
+            "Host identifiers, collection times, evidence paths, and observations are withheld",
+            "Recommendations require human review and grant no execution authority"]},
+        "assessment": assessment, "summary": summary, "findings": safe_findings,
     }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("findings", type=Path, help="deterministic findings JSON file")
-    parser.add_argument("--output", type=Path, help="write sanitized JSON to this file instead of stdout")
+    parser.add_argument("findings", type=Path)
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     try:
         rendered = json.dumps(sanitize(args.findings.read_bytes()), indent=2, sort_keys=True) + "\n"

@@ -9,7 +9,7 @@
   "$defs": {
     "rule": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "control", "title", "severity", "category", "source", "evaluator", "passed", "rationale", "impact", "recommendation"],
+      "required": ["id", "control", "title", "severity", "category", "source", "section", "evaluator", "passed", "rationale", "impact", "recommendation"],
       "properties": {
         "id": {"type": "string", "pattern": "^AIA-[0-9]{4}$"},
         "control": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
@@ -17,6 +17,7 @@
         "severity": {"enum": ["critical", "high", "medium", "low", "info"]},
         "category": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
         "source": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "section": {"type": "string", "pattern": "^[a-z][a-z0-9._-]*$"},
         "evaluator": {"enum": ["filesystem-threshold", "systemd-failed-units", "additional-uid-zero-accounts", "inventory-completeness", "ssh-password-authentication", "ssh-root-login", "auditor-interactive-shell", "report-endpoint-integrity", "auditor-path-permissions"]},
         "passed": {"type": "string", "minLength": 1, "maxLength": 300},
         "rationale": {"type": "string", "minLength": 1, "maxLength": 1000},

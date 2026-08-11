@@ -1,5 +1,22 @@
 # Build Sudoers Configuration
 
+## Compile audit policy
+
+The declarative audit policy is compiled separately from sudoers:
+
+```bash
+python3 modules/audit/build/compile-policy.py
+python3 modules/audit/build/compile-policy.py --check
+```
+
+The first command validates `modules/audit/policy/*.yaml` and updates the
+checked-in `modules/audit/generated/policy-manifest.json`. The second command is
+read-only and fails when the generated manifest is stale. Policy compilation
+also enforces cross-file references and external-safe disclosure requirements.
+
+Target reporting helpers read only the compiled JSON manifest; YAML and JSON
+Schema libraries are not part of the privileged runtime dependency set.
+
 ## Purpose
 
 Generate and validate sudoers file from YAML command definitions.

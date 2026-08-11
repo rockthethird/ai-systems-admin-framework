@@ -12,34 +12,25 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from audit_policy import RULES as POLICY_RULES
+
 REPORT_SCHEMA_VERSION = "ai-auditor-findings/v1"
 ENGINE_VERSION = "ai-auditor-static-rules/v1"
-RULES = (
-    ("AIA-1001", "filesystem-utilization", "filesystems", "Filesystem utilization remains below 90%"),
-    ("AIA-1002", "systemd-failed-units", "systemd.failed_units", "Systemd reports no failed units"),
-    ("AIA-1003", "additional-uid-zero-accounts", "accounts", "No additional UID 0 accounts were found"),
-    ("AIA-1004", "inventory-completeness", "collection", "Required inventory collection completed"),
-    ("AIA-1101", "ssh-password-authentication", "security.ssh", "SSH password authentication is disabled for auditor identities"),
-    ("AIA-1102", "ssh-root-login", "security.ssh", "Direct SSH root login is disabled"),
-    ("AIA-1103", "auditor-interactive-shell", "security.auditor_accounts", "Auditor identities use non-interactive shells"),
-    ("AIA-1104", "report-endpoint-integrity", "security.report_endpoints", "Report endpoints are owned by root and not writable by other users"),
-    ("AIA-1105", "auditor-path-permissions", "security.auditor_accounts", "Auditor homes and authorized_keys have restrictive ownership and modes"),
-)
+RULES = tuple(POLICY_RULES.values())
 
 
 def evidence(section: str, path: str, observation: str) -> dict[str, str]:
     return {"section": section, "path": path, "observation": observation}
 
 
-def finding(identifier: str, title: str, severity: str, category: str,
-            evidence_items: list[dict[str, str]], rationale: str, impact: str,
-            recommendation: str, confidence: float) -> dict[str, Any]:
+def finding(identifier: str, evidence_items: list[dict[str, str]], confidence: float) -> dict[str, Any]:
+    rule = POLICY_RULES[identifier]
     return {
-        "id": identifier, "title": title, "severity": severity,
-        "category": category, "status": "open", "confidence": confidence,
+        "id": identifier, "title": rule["title"], "severity": rule["severity"],
+        "category": rule["category"], "status": "open", "confidence": confidence,
         "sensitivity": "internal", "evidence": evidence_items,
-        "rationale": rationale, "impact": impact,
-        "recommendation": recommendation, "references": [],
+        "rationale": rule["rationale"], "impact": rule["impact"],
+        "recommendation": rule["recommendation"], "references": [],
     }
 
 
@@ -57,14 +48,7 @@ def filesystem_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
                                  f"{columns[-1]} is {percent}% utilized"))
     if not full:
         return []
-    return [finding(
-        "AIA-1001", "Filesystem utilization is at or above 90%", "high",
-        "capacity", full,
-        "Very high filesystem utilization can exhaust write capacity unexpectedly.",
-        "Services may fail to write state, logs, or temporary data.",
-        "Confirm growth and retention expectations, then reclaim or add capacity through an approved maintenance workflow.",
-        0.98,
-    )]
+    return [finding("AIA-1001", full, 0.98)]
 
 
 def failed_unit_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
@@ -77,13 +61,7 @@ def failed_unit_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
             failed.append(evidence("systemd.failed_units", f"/systemd/failed_units/items/{index}", line[:500]))
     if not failed:
         return []
-    return [finding(
-        "AIA-1002", "Systemd reports failed units", "medium", "service-health",
-        failed, "Failed units indicate services that did not reach their requested state.",
-        "Required host functionality may be unavailable or degraded.",
-        "Confirm whether each unit is required, then inspect status and logs through an approved drill-down collector.",
-        0.95,
-    )]
+    return [finding("AIA-1002", failed, 0.95)]
 
 
 def account_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
@@ -94,13 +72,7 @@ def account_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
                                        f"account {account.get('name', '<unknown>')} has UID 0"))
     if not privileged:
         return []
-    return [finding(
-        "AIA-1003", "Additional accounts have UID 0", "critical", "identity",
-        privileged, "UID 0 accounts have root-equivalent operating-system authority.",
-        "Unexpected credentials for these accounts can provide unrestricted host access.",
-        "Verify each account's ownership and necessity, then remove or reassign unexpected UID 0 identities through an approved workflow.",
-        0.99,
-    )]
+    return [finding("AIA-1003", privileged, 0.99)]
 
 
 def collection_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
@@ -124,13 +96,7 @@ def collection_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
     walk(inventory, "")
     if not issues:
         return []
-    return [finding(
-        "AIA-1004", "Inventory collection was incomplete", "low", "evidence-quality",
-        issues, "Missing, failed, or truncated collectors reduce the completeness of the audit evidence.",
-        "Other findings may be absent or have lower confidence.",
-        "Review collector errors and platform dependencies before treating the audit as complete.",
-        1.0,
-    )]
+    return [finding("AIA-1004", issues, 1.0)]
 
 
 def ssh_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
@@ -148,15 +114,9 @@ def ssh_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
                                        f"PermitRootLogin is {settings.get('permitrootlogin', 'unknown')}"))
     findings = []
     if password:
-        findings.append(finding("AIA-1101", "SSH permits password-capable authentication", "high", "access-control", password,
-                                "Password-capable SSH authentication expands the remote credential attack surface.",
-                                "Guessed, reused, or disclosed passwords may permit remote access.",
-                                "Disable password and keyboard-interactive authentication for auditor identities after validating key access.", 0.99))
+        findings.append(finding("AIA-1101", password, 0.99))
     if root_login:
-        findings.append(finding("AIA-1102", "SSH permits direct root login", "medium", "access-control", root_login,
-                                "Direct root SSH authentication bypasses attribution through a named administrative account.",
-                                "A compromised root credential provides immediate unrestricted host authority.",
-                                "Set PermitRootLogin to no after validating an alternate administrative recovery path.", 0.98))
+        findings.append(finding("AIA-1102", root_login, 0.98))
     return findings
 
 
@@ -194,15 +154,9 @@ def auditor_account_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
                                       f"auditor account {account.get('name', 'unknown')} authorized_keys ownership or mode is unsafe"))
     findings = []
     if shells:
-        findings.append(finding("AIA-1103", "Auditor identities have interactive shells", "medium", "access-control", shells,
-                                "An interactive shell increases the impact of an SSH command-boundary failure.",
-                                "A compromised auditor credential may gain a general-purpose command environment.",
-                                "Use a non-interactive shell together with an SSH forced command for report-only identities.", 0.99))
+        findings.append(finding("AIA-1103", shells, 0.99))
     if paths:
-        findings.append(finding("AIA-1105", "Auditor account paths have unsafe permissions", "high", "file-integrity", paths,
-                                "Writable account homes or key files can let another identity alter SSH authentication behavior.",
-                                "An attacker may replace trusted keys or influence the report identity's login environment.",
-                                "Restore account ownership and remove group or other write access; restrict authorized_keys to its owner.", 0.98))
+        findings.append(finding("AIA-1105", paths, 0.98))
     return findings
 
 
@@ -221,10 +175,7 @@ def endpoint_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
                                    "a report endpoint is missing, not root-owned, or writable by non-root"))
     if not unsafe:
         return []
-    return [finding("AIA-1104", "Report endpoint integrity is not enforced", "critical", "privilege-boundary", unsafe,
-                    "The sudo boundary trusts fixed report endpoint files executed as root.",
-                    "Modification of an endpoint can turn the narrow sudo capability into arbitrary root execution.",
-                    "Install every endpoint as root-owned and remove group and other write permissions.", 0.99)]
+    return [finding("AIA-1104", unsafe, 0.99)]
 
 
 def result_available(value: Any) -> bool:
@@ -248,10 +199,11 @@ def assessment(findings: list[dict[str, Any]], inventory: dict[str, Any]) -> dic
         "AIA-1105": isinstance(inventory.get("security", {}).get("auditor_accounts"), list),
     }
     results = []
-    for identifier, control, section, passed_summary in RULES:
+    for rule in RULES:
+        identifier = rule["id"]
         status = "failed" if identifier in failed else ("passed" if availability[identifier] else "unknown")
-        results.append({"id": identifier, "control": control, "section": section,
-                        "status": status, "summary": passed_summary if status == "passed" else None})
+        results.append({"id": identifier, "control": rule["control"], "section": rule["section"],
+                        "status": status, "summary": rule["passed"] if status == "passed" else None})
     counts = {status: sum(item["status"] == status for item in results)
               for status in ("passed", "failed", "unknown")}
     return {"rules_evaluated": len(results), **counts, "results": results}
