@@ -6,7 +6,7 @@ Experimental, least-privilege host inventory for AI-assisted auditing.
 
 The module creates separate locked `ai-auditor-cloud` and `ai-auditor-local` identities. Cloud can execute only the no-argument external-safe endpoint; local can execute only the no-argument internal-rich endpoint. Both collect bounded evidence through root-only helpers, and neither identity can execute or sudo the raw collector.
 
-This is an inventory, deterministic findings, and external-safe reporting prototype. Adaptive drill-down and remediation are not implemented. The module is alpha software and is not production-ready.
+The report includes explicit passed, failed, and unknown outcomes for nine deterministic controls, including effective SSH policy and the integrity of the report access boundary. Adaptive drill-down and remediation are not implemented. The module is alpha software and is not production-ready.
 
 ## Security model
 
@@ -48,8 +48,8 @@ SSH key setup and SSH hardening are separate steps; see [deploy/README.md](deplo
 ## Next milestones
 
 1. Repeat end-to-end deployment and denial testing on supported Linux distributions.
-2. Integrate the external-safe report wrapper with Hermes without exposing raw inventory.
-3. Expand the unprivileged analysis rules from evidence gathered in real audits.
+2. Bind separate SSH credentials and forced commands to the cloud and local report identities.
+3. Exercise the external-safe report wrapper through Hermes without exposing raw inventory.
 4. Add drill-down collectors only when real audits identify missing evidence.
 5. Add centralized, tamper-resistant logging before making stronger auditability claims.
 

@@ -28,7 +28,7 @@ The AI is not trusted as a system administrator. It may analyze broad evidence, 
   - Covers schema, missing and relative commands, timeout behavior, byte truncation, argument rejection, resource ceilings, and the pinned interpreter.
 - Documentation now labels the module alpha, distinguishes implemented tests from historical proposals, and includes `modules/audit/docs/THREAT-MODEL.md`.
 - `modules/audit/reporting/` defines the unprivileged `ai-auditor-findings/v1` report contract, provenance, evidence pointers, confidence, sensitivity, and lifecycle fields.
-- `modules/audit/reporting/analyze-inventory.py` provides an initial deterministic, unprivileged analysis pass for capacity, failed services, UID 0 identities, and evidence completeness.
+- `modules/audit/reporting/analyze-inventory.py` publishes explicit passed, failed, and unknown outcomes for nine deterministic controls covering capacity, failed services, UID 0 identities, evidence completeness, effective SSH authentication, auditor shells and paths, and report-endpoint integrity.
 - `modules/audit/reporting/sanitize-findings.py` produces a fail-closed `external-safe/v1` view for Hermes. It withholds host identifiers, timestamps, raw evidence, and JSON pointers while retaining controlled rule text, severity, confidence, hashes, evidence counts, and completeness.
 - `modules/audit/reporting/prepare-external-report.sh` runs local analysis followed by sanitization so raw inventory and evidence-rich findings do not enter the normal model-facing workflow.
 - `modules/audit/reporting/ai-auditor-report.sh` is the installed AI-facing endpoint. It creates root-only temporary evidence, calls the private collector/analyzer/sanitizer chain, emits only external-safe JSON, and removes intermediate artifacts on exit.
@@ -54,6 +54,8 @@ The original raw collector boundary passed end-to-end deployment inside a dispos
 - rejection of report arguments and denial of an attempted `/bin/sh`,
 - and an exact report-only rule shown by `sudo -l -U ai-auditor`.
 
+The expanded nine-rule endpoint was deployed on 2026-08-11. Both profiles reported six passed and three failed controls with no unknowns. The live failures were password-capable SSH authentication, direct root SSH login, and interactive shells for the two report identities. Endpoint ownership and auditor path permissions passed. External-safe leakage checks and cross-profile/raw-collector denial checks also passed.
+
 ## Hermes review
 
 The live Hermes gateway was queried through its configured free model using only a generic architecture description; private repository contents were not sent to the external Nous Portal. Its review helped identify the need for explicit no-argument sudoers matching and defense-in-depth argument rejection. It also recommended future resource-limit and syscall-level testing.
@@ -64,7 +66,7 @@ Hermes currently runs on the audited host with direct Docker and SSH paths only 
 
 1. Repeat end-to-end deployment on additional supported distributions and future remote targets.
 2. Repeat the fixed-command syscall trace on the target VM, including its real systemd and optional Docker paths.
-3. Expand unprivileged analysis rules only from conditions observed in real audit evidence.
+3. Decide and implement the SSH forced-command and key-binding design, then remediate the three intentionally exposed pre-binding findings.
 4. Add narrow drill-down collectors only when real audit evidence demonstrates a need.
 5. Add centralized, tamper-resistant logging before making complete-auditability claims.
 
