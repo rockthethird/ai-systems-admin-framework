@@ -34,6 +34,11 @@ PUBLIC_RULES = {
                  "Missing, failed, or truncated collectors reduce the completeness of the audit evidence.",
                  "Other findings may be absent or have lower confidence.",
                  "Review collector errors and platform dependencies before treating the audit as complete."),
+    "AIA-1101": ("SSH permits password-capable authentication", "high", "access-control", "Password-capable SSH authentication expands the remote credential attack surface.", "Guessed, reused, or disclosed passwords may permit remote access.", "Disable password and keyboard-interactive authentication for auditor identities after validating key access."),
+    "AIA-1102": ("SSH permits direct root login", "medium", "access-control", "Direct root SSH authentication bypasses attribution through a named administrative account.", "A compromised root credential provides immediate unrestricted host authority.", "Set PermitRootLogin to no after validating an alternate administrative recovery path."),
+    "AIA-1103": ("Auditor identities have interactive shells", "medium", "access-control", "An interactive shell increases the impact of an SSH command-boundary failure.", "A compromised auditor credential may gain a general-purpose command environment.", "Use a non-interactive shell together with an SSH forced command for report-only identities."),
+    "AIA-1104": ("Report endpoint integrity is not enforced", "critical", "privilege-boundary", "The sudo boundary trusts fixed report endpoint files executed as root.", "Modification of an endpoint can turn the narrow sudo capability into arbitrary root execution.", "Install every endpoint as root-owned and remove group and other write permissions."),
+    "AIA-1105": ("Auditor account paths have unsafe permissions", "high", "file-integrity", "Writable account homes or key files can let another identity alter SSH authentication behavior.", "An attacker may replace trusted keys or influence the report identity's login environment.", "Restore account ownership and remove group or other write access; restrict authorized_keys to its owner."),
 }
 FIELDS = ("title", "severity", "category", "rationale", "impact", "recommendation")
 
@@ -91,6 +96,15 @@ def safe_detail(identifier: str, item: dict[str, Any]) -> str:
         if match and re.fullmatch(r"[A-Za-z0-9_.@-]{1,128}", match.group(1)):
             return f"account {match.group(1)} has UID 0"
         return "account identifier withheld because it did not match the expected format"
+    if identifier in {"AIA-1101", "AIA-1102", "AIA-1103", "AIA-1105"}:
+        match = re.search(r"(ai-auditor-(?:cloud|local))", observation)
+        if match:
+            return f"{match.group(1)} does not meet the {identifier} control"
+        if identifier == "AIA-1102" and re.fullmatch(r"PermitRootLogin is [A-Za-z-]+", observation):
+            return observation
+        return f"evidence for {identifier} was retained without host-controlled detail"
+    if identifier == "AIA-1104":
+        return "a report endpoint is missing, not root-owned, or writable by non-root"
     if observation == "collector output was truncated":
         return "collector output was truncated"
     if observation == "required collector command was unavailable":

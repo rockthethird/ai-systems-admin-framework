@@ -97,7 +97,7 @@
             "required": ["observation_count", "sections", "details"],
             "properties": {
               "observation_count": {"type": "integer", "minimum": 1},
-              "sections": {"type": "array", "items": {"enum": ["accounts", "collection", "filesystems", "systemd.failed_units", "other"]}, "minItems": 1, "uniqueItems": true},
+              "sections": {"type": "array", "items": {"enum": ["accounts", "collection", "filesystems", "systemd.failed_units", "security.ssh", "security.auditor_accounts", "security.report_endpoints", "other"]}, "minItems": 1, "uniqueItems": true},
               "details": {"const": "withheld"}
             }
           }

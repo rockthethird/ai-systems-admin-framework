@@ -17,6 +17,7 @@ TRUSTED_ENGINE = "ai-auditor-static-rules/v1"
 SEVERITIES = ("critical", "high", "medium", "low", "info")
 SAFE_SECTIONS = {
     "accounts", "collection", "filesystems", "systemd.failed_units",
+    "security.ssh", "security.auditor_accounts", "security.report_endpoints",
 }
 
 # Public text is reconstructed rather than copied from the input report. This
@@ -55,6 +56,21 @@ PUBLIC_RULES = {
         "impact": "Other findings may be absent or have lower confidence.",
         "recommendation": "Review collector errors and platform dependencies before treating the audit as complete.",
     },
+    "AIA-1101": {"title": "SSH permits password-capable authentication", "severity": "high", "category": "access-control",
+        "rationale": "Password-capable SSH authentication expands the remote credential attack surface.", "impact": "Guessed, reused, or disclosed passwords may permit remote access.",
+        "recommendation": "Disable password and keyboard-interactive authentication for auditor identities after validating key access."},
+    "AIA-1102": {"title": "SSH permits direct root login", "severity": "medium", "category": "access-control",
+        "rationale": "Direct root SSH authentication bypasses attribution through a named administrative account.", "impact": "A compromised root credential provides immediate unrestricted host authority.",
+        "recommendation": "Set PermitRootLogin to no after validating an alternate administrative recovery path."},
+    "AIA-1103": {"title": "Auditor identities have interactive shells", "severity": "medium", "category": "access-control",
+        "rationale": "An interactive shell increases the impact of an SSH command-boundary failure.", "impact": "A compromised auditor credential may gain a general-purpose command environment.",
+        "recommendation": "Use a non-interactive shell together with an SSH forced command for report-only identities."},
+    "AIA-1104": {"title": "Report endpoint integrity is not enforced", "severity": "critical", "category": "privilege-boundary",
+        "rationale": "The sudo boundary trusts fixed report endpoint files executed as root.", "impact": "Modification of an endpoint can turn the narrow sudo capability into arbitrary root execution.",
+        "recommendation": "Install every endpoint as root-owned and remove group and other write permissions."},
+    "AIA-1105": {"title": "Auditor account paths have unsafe permissions", "severity": "high", "category": "file-integrity",
+        "rationale": "Writable account homes or key files can let another identity alter SSH authentication behavior.", "impact": "An attacker may replace trusted keys or influence the report identity's login environment.",
+        "recommendation": "Restore account ownership and remove group or other write access; restrict authorized_keys to its owner."},
 }
 
 

@@ -27,6 +27,11 @@ inventory = {
         {"name": "root", "uid": 0},
         {"name": "unexpected-admin", "uid": 0},
     ],
+    "security": {
+        "ssh": {"available": True, "users": [{"name": "ai-auditor-cloud", "available": True, "settings": {"passwordauthentication": "yes", "kbdinteractiveauthentication": "no", "permitrootlogin": "prohibit-password"}}], "error": None},
+        "auditor_accounts": [{"name": "ai-auditor-cloud", "exists": True, "uid": 996, "shell": "/bin/bash", "home": "/opt/ai-auditor-cloud", "home_metadata": {"exists": True, "mode": "0o777", "uid": 996}, "authorized_keys_metadata": {"exists": False}}],
+        "report_endpoints": [{"path": "/usr/local/libexec/ai-auditor-report", "exists": True, "mode": "0o775", "uid": 1000, "gid": 1000}],
+    },
     "packages": {**command, "truncated": True},
     "containers": {"available": False, "items": [], "truncated": False, "exit_code": None, "error": "command not found"},
 }
@@ -43,17 +48,16 @@ from pathlib import Path
 
 schema = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 report = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
-assert [item["id"] for item in report["findings"]] == ["AIA-1003", "AIA-1001", "AIA-1002", "AIA-1004"]
-assert report["summary"] == {"total": 4, "critical": 1, "high": 1, "medium": 1, "low": 1, "info": 0}
+assert [item["id"] for item in report["findings"]] == ["AIA-1003", "AIA-1104", "AIA-1001", "AIA-1101", "AIA-1105", "AIA-1002", "AIA-1102", "AIA-1103", "AIA-1004"]
+assert report["summary"] == {"total": 9, "critical": 2, "high": 3, "medium": 3, "low": 1, "info": 0}
 assert report["source"]["host"] == "analysis-test"
 assert report["analysis"]["model"] is None
-assert report["assessment"]["rules_evaluated"] == 4
+assert report["assessment"]["rules_evaluated"] == 9
 assert report["assessment"]["passed"] == 0
-assert report["assessment"]["failed"] == 4
+assert report["assessment"]["failed"] == 9
 assert report["assessment"]["unknown"] == 0
-assert {item["id"]: item["status"] for item in report["assessment"]["results"]} == {
-    "AIA-1001": "failed", "AIA-1002": "failed", "AIA-1003": "failed", "AIA-1004": "failed",
-}
+statuses = {item["id"]: item["status"] for item in report["assessment"]["results"]}
+assert all(status == "failed" for status in statuses.values())
 
 try:
     import jsonschema

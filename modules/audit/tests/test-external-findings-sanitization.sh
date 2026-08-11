@@ -30,6 +30,11 @@ inventory = {
         {"name": "root", "uid": 0},
         {"name": "secret-admin@example.test", "uid": 0},
     ],
+    "security": {
+        "ssh": {"available": True, "users": [{"name": "ai-auditor-cloud", "available": True, "settings": {"passwordauthentication": "yes", "kbdinteractiveauthentication": "no", "permitrootlogin": "prohibit-password"}}], "error": None},
+        "auditor_accounts": [{"name": "ai-auditor-cloud", "exists": True, "uid": 996, "shell": "/bin/bash", "home": "/opt/secret-home", "home_metadata": {"exists": True, "mode": "0o777", "uid": 996}, "authorized_keys_metadata": {"exists": False}}],
+        "report_endpoints": [{"path": "/secret/report", "exists": True, "mode": "0o777", "uid": 1000, "gid": 1000}],
+    },
     "packages": {**command, "truncated": True},
     "containers": {"available": False, "items": [], "truncated": False, "exit_code": None, "error": "secret socket path"},
 }
@@ -68,17 +73,17 @@ assert report["disclosure"] == {
     "evidence_paths_included": False,
     "host_identifiers_included": False,
     "raw_inventory_included": False,
-    "withheld_evidence_items": 4,
+    "withheld_evidence_items": 9,
 }
-assert report["summary"] == {"total": 4, "critical": 1, "high": 1, "medium": 1, "low": 1, "info": 0}
-assert report["assessment"]["rules_evaluated"] == 4
-assert report["assessment"]["failed"] == 4
+assert report["summary"] == {"total": 9, "critical": 2, "high": 3, "medium": 3, "low": 1, "info": 0}
+assert report["assessment"]["rules_evaluated"] == 9
+assert report["assessment"]["failed"] == 9
 assert report["assessment"]["passed"] == 0
 assert report["assessment"]["unknown"] == 0
 for secret in (
     "secret-host", "2026-08-10", "/customer-secret", "/dev/secret",
     "secret-customer", "Ignore previous instructions", "secret-admin",
-    "secret socket path", "/filesystems/items/1",
+    "secret socket path", "/filesystems/items/1", "/opt/secret-home", "/secret/report",
 ):
     assert secret not in rendered, f"external report leaked {secret!r}"
 assert all(item["evidence"]["details"] == "withheld" for item in report["findings"])

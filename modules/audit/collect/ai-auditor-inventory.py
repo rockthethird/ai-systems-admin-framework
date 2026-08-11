@@ -25,6 +25,9 @@ MAX_CPU_SECONDS = 5
 MAX_OPEN_FILES = 256
 MAX_FILE_BYTES = 1024 * 1024
 SAFE_ENV = {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C", "LC_ALL": "C"}
+AUDITOR_USERS = ("ai-auditor-cloud", "ai-auditor-local")
+REPORT_PATHS = ("/usr/local/libexec/ai-auditor-report", "/usr/local/libexec/ai-auditor-report-internal")
+SSH_SETTINGS = {"passwordauthentication", "kbdinteractiveauthentication", "pubkeyauthentication", "permitrootlogin"}
 
 
 def unavailable(error: str = "command not found") -> dict[str, Any]:
@@ -132,6 +135,48 @@ def task_paths() -> list[dict[str, Any]]:
     return result
 
 
+def path_metadata(path: Path) -> dict[str, Any]:
+    try:
+        stat = path.stat()
+        return {"path": str(path), "exists": True, "mode": oct(stat.st_mode & 0o7777),
+                "uid": stat.st_uid, "gid": stat.st_gid}
+    except OSError:
+        return {"path": str(path), "exists": False, "mode": None, "uid": None, "gid": None}
+
+
+def ssh_posture() -> dict[str, Any]:
+    sshd = next((path for path in ("/usr/sbin/sshd", "/sbin/sshd") if os.access(path, os.X_OK)), None)
+    if sshd is None:
+        return {"available": False, "users": [], "error": "sshd not found"}
+    users = []
+    for name in AUDITOR_USERS:
+        result = run([sshd, "-T", "-C", f"user={name},host=localhost,addr=127.0.0.1"])
+        settings = {}
+        if result["available"] and result["exit_code"] == 0 and not result["truncated"]:
+            for line in result["items"]:
+                key, _, value = line.partition(" ")
+                if key in SSH_SETTINGS:
+                    settings[key] = value.strip()
+        users.append({"name": name, "available": set(settings) == SSH_SETTINGS, "settings": settings})
+    return {"available": all(user["available"] for user in users), "users": users, "error": None}
+
+
+def auditor_paths() -> list[dict[str, Any]]:
+    result = []
+    accounts = {entry.pw_name: entry for entry in pwd.getpwall() if entry.pw_name in AUDITOR_USERS}
+    for name in AUDITOR_USERS:
+        entry = accounts.get(name)
+        if entry is None:
+            result.append({"name": name, "exists": False, "uid": None, "shell": None, "home": None,
+                           "home_metadata": None, "authorized_keys_metadata": None})
+            continue
+        home = Path(entry.pw_dir)
+        result.append({"name": name, "exists": True, "uid": entry.pw_uid, "shell": entry.pw_shell, "home": entry.pw_dir,
+                       "home_metadata": path_metadata(home),
+                       "authorized_keys_metadata": path_metadata(home / ".ssh" / "authorized_keys")})
+    return result
+
+
 def main() -> None:
     if len(sys.argv) != 1:
         raise SystemExit("ai-auditor-inventory does not accept arguments")
@@ -157,6 +202,8 @@ def main() -> None:
                     "timers": first_available([["/usr/bin/systemctl", "--no-pager", "--plain", "list-timers", "--all"], ["/bin/systemctl", "--no-pager", "--plain", "list-timers", "--all"]]),
                     "enabled_units": first_available([["/usr/bin/systemctl", "--no-pager", "--plain", "list-unit-files", "--state=enabled"], ["/bin/systemctl", "--no-pager", "--plain", "list-unit-files", "--state=enabled"]])},
         "accounts": accounts, "packages": packages,
+        "security": {"ssh": ssh_posture(), "auditor_accounts": auditor_paths(),
+                     "report_endpoints": [path_metadata(Path(path)) for path in REPORT_PATHS]},
         # Docker daemon visibility is sensitive and intentionally optional.
         "containers": first_available([["/usr/bin/docker", "ps", "--all", "--no-trunc", "--format", "{{json .}}"],
                                        ["/usr/local/bin/docker", "ps", "--all", "--no-trunc", "--format", "{{json .}}"]]),

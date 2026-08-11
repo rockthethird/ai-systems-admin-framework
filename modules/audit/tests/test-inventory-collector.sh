@@ -17,12 +17,15 @@ import json
 import sys
 with open(sys.argv[1], encoding="utf-8") as stream:
     data = json.load(stream)
-required = {"schema_version", "collected_at", "limits", "host", "filesystems", "network", "systemd", "accounts", "packages", "containers", "scheduled_tasks"}
+required = {"schema_version", "collected_at", "limits", "host", "filesystems", "network", "systemd", "accounts", "packages", "containers", "scheduled_tasks", "security"}
 missing = sorted(required - data.keys())
 assert not missing, f"missing top-level keys: {missing}"
 assert data["schema_version"] == "1.0"
 assert data["host"]["hostname"]
 assert isinstance(data["accounts"], list)
+assert set(data["security"]) == {"ssh", "auditor_accounts", "report_endpoints"}
+assert len(data["security"]["auditor_accounts"]) == 2
+assert len(data["security"]["report_endpoints"]) == 2
 assert data["limits"]["max_bytes_per_stream"] > 0
 print("inventory collector test passed")
 PY

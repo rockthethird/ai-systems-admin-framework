@@ -19,6 +19,11 @@ RULES = (
     ("AIA-1002", "systemd-failed-units", "systemd.failed_units", "Systemd reports no failed units"),
     ("AIA-1003", "additional-uid-zero-accounts", "accounts", "No additional UID 0 accounts were found"),
     ("AIA-1004", "inventory-completeness", "collection", "Required inventory collection completed"),
+    ("AIA-1101", "ssh-password-authentication", "security.ssh", "SSH password authentication is disabled for auditor identities"),
+    ("AIA-1102", "ssh-root-login", "security.ssh", "Direct SSH root login is disabled"),
+    ("AIA-1103", "auditor-interactive-shell", "security.auditor_accounts", "Auditor identities use non-interactive shells"),
+    ("AIA-1104", "report-endpoint-integrity", "security.report_endpoints", "Report endpoints are owned by root and not writable by other users"),
+    ("AIA-1105", "auditor-path-permissions", "security.auditor_accounts", "Auditor homes and authorized_keys have restrictive ownership and modes"),
 )
 
 
@@ -128,6 +133,100 @@ def collection_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
     )]
 
 
+def ssh_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
+    users = inventory.get("security", {}).get("ssh", {}).get("users", [])
+    password = []
+    root_login = []
+    for index, user in enumerate(users if isinstance(users, list) else []):
+        settings = user.get("settings", {}) if isinstance(user, dict) else {}
+        name = user.get("name", "unknown") if isinstance(user, dict) else "unknown"
+        if settings.get("passwordauthentication") != "no" or settings.get("kbdinteractiveauthentication") != "no":
+            password.append(evidence("security.ssh", f"/security/ssh/users/{index}/settings",
+                                     f"password-capable SSH authentication is enabled for {name}"))
+        if settings.get("permitrootlogin") != "no":
+            root_login.append(evidence("security.ssh", f"/security/ssh/users/{index}/settings/permitrootlogin",
+                                       f"PermitRootLogin is {settings.get('permitrootlogin', 'unknown')}"))
+    findings = []
+    if password:
+        findings.append(finding("AIA-1101", "SSH permits password-capable authentication", "high", "access-control", password,
+                                "Password-capable SSH authentication expands the remote credential attack surface.",
+                                "Guessed, reused, or disclosed passwords may permit remote access.",
+                                "Disable password and keyboard-interactive authentication for auditor identities after validating key access.", 0.99))
+    if root_login:
+        findings.append(finding("AIA-1102", "SSH permits direct root login", "medium", "access-control", root_login,
+                                "Direct root SSH authentication bypasses attribution through a named administrative account.",
+                                "A compromised root credential provides immediate unrestricted host authority.",
+                                "Set PermitRootLogin to no after validating an alternate administrative recovery path.", 0.98))
+    return findings
+
+
+def auditor_account_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
+    accounts = inventory.get("security", {}).get("auditor_accounts", [])
+    shells = []
+    paths = []
+    for index, account in enumerate(accounts if isinstance(accounts, list) else []):
+        if not isinstance(account, dict):
+            continue
+        if not account.get("exists"):
+            paths.append(evidence("security.auditor_accounts", f"/security/auditor_accounts/{index}",
+                                  f"auditor account {account.get('name', 'unknown')} is missing"))
+            continue
+        if account.get("shell") not in {"/usr/sbin/nologin", "/sbin/nologin", "/bin/false"}:
+            shells.append(evidence("security.auditor_accounts", f"/security/auditor_accounts/{index}/shell",
+                                   f"auditor account {account.get('name', 'unknown')} uses an interactive shell"))
+        expected_uid = account.get("uid")
+        home = account.get("home_metadata") or {}
+        authorized = account.get("authorized_keys_metadata") or {}
+        try:
+            home_mode = int(str(home.get("mode")), 8)
+        except (TypeError, ValueError):
+            home_mode = -1
+        if not home.get("exists") or home.get("uid") != expected_uid or home_mode < 0 or home_mode & 0o022:
+            paths.append(evidence("security.auditor_accounts", f"/security/auditor_accounts/{index}/home_metadata",
+                                  f"auditor account {account.get('name', 'unknown')} home ownership or mode is unsafe"))
+        if authorized.get("exists"):
+            try:
+                key_mode = int(str(authorized.get("mode")), 8)
+            except (TypeError, ValueError):
+                key_mode = -1
+            if authorized.get("uid") != expected_uid or key_mode < 0 or key_mode & 0o077:
+                paths.append(evidence("security.auditor_accounts", f"/security/auditor_accounts/{index}/authorized_keys_metadata",
+                                      f"auditor account {account.get('name', 'unknown')} authorized_keys ownership or mode is unsafe"))
+    findings = []
+    if shells:
+        findings.append(finding("AIA-1103", "Auditor identities have interactive shells", "medium", "access-control", shells,
+                                "An interactive shell increases the impact of an SSH command-boundary failure.",
+                                "A compromised auditor credential may gain a general-purpose command environment.",
+                                "Use a non-interactive shell together with an SSH forced command for report-only identities.", 0.99))
+    if paths:
+        findings.append(finding("AIA-1105", "Auditor account paths have unsafe permissions", "high", "file-integrity", paths,
+                                "Writable account homes or key files can let another identity alter SSH authentication behavior.",
+                                "An attacker may replace trusted keys or influence the report identity's login environment.",
+                                "Restore account ownership and remove group or other write access; restrict authorized_keys to its owner.", 0.98))
+    return findings
+
+
+def endpoint_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
+    endpoints = inventory.get("security", {}).get("report_endpoints", [])
+    unsafe = []
+    for index, endpoint in enumerate(endpoints if isinstance(endpoints, list) else []):
+        if not isinstance(endpoint, dict):
+            continue
+        try:
+            mode = int(str(endpoint.get("mode")), 8)
+        except (TypeError, ValueError):
+            mode = -1
+        if not endpoint.get("exists") or endpoint.get("uid") != 0 or endpoint.get("gid") != 0 or mode < 0 or mode & 0o022:
+            unsafe.append(evidence("security.report_endpoints", f"/security/report_endpoints/{index}",
+                                   "a report endpoint is missing, not root-owned, or writable by non-root"))
+    if not unsafe:
+        return []
+    return [finding("AIA-1104", "Report endpoint integrity is not enforced", "critical", "privilege-boundary", unsafe,
+                    "The sudo boundary trusts fixed report endpoint files executed as root.",
+                    "Modification of an endpoint can turn the narrow sudo capability into arbitrary root execution.",
+                    "Install every endpoint as root-owned and remove group and other write permissions.", 0.99)]
+
+
 def result_available(value: Any) -> bool:
     return (isinstance(value, dict) and value.get("available") is True
             and value.get("truncated") is False and not value.get("error"))
@@ -142,6 +241,11 @@ def assessment(findings: list[dict[str, Any]], inventory: dict[str, Any]) -> dic
         # This rule evaluates the completeness of every required command result,
         # so its own evidence is always sufficient when the inventory is valid.
         "AIA-1004": True,
+        "AIA-1101": inventory.get("security", {}).get("ssh", {}).get("available") is True,
+        "AIA-1102": inventory.get("security", {}).get("ssh", {}).get("available") is True,
+        "AIA-1103": isinstance(inventory.get("security", {}).get("auditor_accounts"), list),
+        "AIA-1104": isinstance(inventory.get("security", {}).get("report_endpoints"), list),
+        "AIA-1105": isinstance(inventory.get("security", {}).get("auditor_accounts"), list),
     }
     results = []
     for identifier, control, section, passed_summary in RULES:
@@ -158,7 +262,8 @@ def analyze(raw_inventory: bytes) -> dict[str, Any]:
     if inventory.get("schema_version") != "1.0":
         raise ValueError("unsupported inventory schema_version")
     findings = []
-    for rule in (filesystem_findings, failed_unit_findings, account_findings, collection_findings):
+    for rule in (filesystem_findings, failed_unit_findings, account_findings, collection_findings,
+                 ssh_findings, auditor_account_findings, endpoint_findings):
         findings.extend(rule(inventory))
     order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
     findings.sort(key=lambda item: (order[item["severity"]], item["id"]))
