@@ -47,6 +47,13 @@ assert [item["id"] for item in report["findings"]] == ["AIA-1003", "AIA-1001", "
 assert report["summary"] == {"total": 4, "critical": 1, "high": 1, "medium": 1, "low": 1, "info": 0}
 assert report["source"]["host"] == "analysis-test"
 assert report["analysis"]["model"] is None
+assert report["assessment"]["rules_evaluated"] == 4
+assert report["assessment"]["passed"] == 0
+assert report["assessment"]["failed"] == 4
+assert report["assessment"]["unknown"] == 0
+assert {item["id"]: item["status"] for item in report["assessment"]["results"]} == {
+    "AIA-1001": "failed", "AIA-1002": "failed", "AIA-1003": "failed", "AIA-1004": "failed",
+}
 
 try:
     import jsonschema

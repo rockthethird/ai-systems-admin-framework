@@ -4,7 +4,7 @@
   "title": "AI Auditor External Findings v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "profile", "source", "disclosure", "evidence_quality", "analysis", "summary", "findings"],
+  "required": ["schema_version", "profile", "source", "disclosure", "evidence_quality", "analysis", "assessment", "summary", "findings"],
   "properties": {
     "schema_version": {"const": "ai-auditor-external-findings/v1"},
     "profile": {"const": "external-safe/v1"},
@@ -40,6 +40,26 @@
         "engine": {"const": "ai-auditor-static-rules/v1"},
         "model": {"const": null},
         "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true}
+      }
+    },
+    "assessment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["rules_evaluated", "passed", "failed", "unknown", "results"],
+      "properties": {
+        "rules_evaluated": {"type": "integer", "minimum": 1},
+        "passed": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0},
+        "unknown": {"type": "integer", "minimum": 0},
+        "results": {"type": "array", "minItems": 1, "items": {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "control", "section", "status"],
+          "properties": {
+            "id": {"type": "string", "pattern": "^AIA-[0-9]{4}$"},
+            "control": {"type": "string", "minLength": 1},
+            "section": {"type": "string", "minLength": 1},
+            "status": {"enum": ["passed", "failed", "unknown"]}
+          }
+        }}
       }
     },
     "summary": {

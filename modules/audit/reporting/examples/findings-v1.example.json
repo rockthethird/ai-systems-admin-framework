@@ -16,6 +16,21 @@
       "No configuration contents or logs were collected"
     ]
   },
+  "assessment": {
+    "rules_evaluated": 1,
+    "passed": 0,
+    "failed": 1,
+    "unknown": 0,
+    "results": [
+      {
+        "id": "AIA-0001",
+        "control": "example-failed-service",
+        "section": "systemd.failed_units",
+        "status": "failed",
+        "summary": null
+      }
+    ]
+  },
   "summary": {
     "total": 1,
     "critical": 0,

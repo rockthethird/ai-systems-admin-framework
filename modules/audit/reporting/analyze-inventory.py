@@ -14,6 +14,12 @@ from typing import Any
 
 REPORT_SCHEMA_VERSION = "ai-auditor-findings/v1"
 ENGINE_VERSION = "ai-auditor-static-rules/v1"
+RULES = (
+    ("AIA-1001", "filesystem-utilization", "filesystems", "Filesystem utilization remains below 90%"),
+    ("AIA-1002", "systemd-failed-units", "systemd.failed_units", "Systemd reports no failed units"),
+    ("AIA-1003", "additional-uid-zero-accounts", "accounts", "No additional UID 0 accounts were found"),
+    ("AIA-1004", "inventory-completeness", "collection", "Required inventory collection completed"),
+)
 
 
 def evidence(section: str, path: str, observation: str) -> dict[str, str]:
@@ -122,6 +128,31 @@ def collection_findings(inventory: dict[str, Any]) -> list[dict[str, Any]]:
     )]
 
 
+def result_available(value: Any) -> bool:
+    return (isinstance(value, dict) and value.get("available") is True
+            and value.get("truncated") is False and not value.get("error"))
+
+
+def assessment(findings: list[dict[str, Any]], inventory: dict[str, Any]) -> dict[str, Any]:
+    failed = {item["id"] for item in findings}
+    availability = {
+        "AIA-1001": result_available(inventory.get("filesystems")),
+        "AIA-1002": result_available(inventory.get("systemd", {}).get("failed_units")),
+        "AIA-1003": isinstance(inventory.get("accounts"), list),
+        # This rule evaluates the completeness of every required command result,
+        # so its own evidence is always sufficient when the inventory is valid.
+        "AIA-1004": True,
+    }
+    results = []
+    for identifier, control, section, passed_summary in RULES:
+        status = "failed" if identifier in failed else ("passed" if availability[identifier] else "unknown")
+        results.append({"id": identifier, "control": control, "section": section,
+                        "status": status, "summary": passed_summary if status == "passed" else None})
+    counts = {status: sum(item["status"] == status for item in results)
+              for status in ("passed", "failed", "unknown")}
+    return {"rules_evaluated": len(results), **counts, "results": results}
+
+
 def analyze(raw_inventory: bytes) -> dict[str, Any]:
     inventory = json.loads(raw_inventory)
     if inventory.get("schema_version") != "1.0":
@@ -152,6 +183,7 @@ def analyze(raw_inventory: bytes) -> dict[str, Any]:
                 "Recommendations require human review and grant no execution authority",
             ],
         },
+        "assessment": assessment(findings, inventory),
         "summary": {"total": len(findings), **counts},
         "findings": findings,
     }

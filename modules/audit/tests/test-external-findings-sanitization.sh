@@ -71,6 +71,10 @@ assert report["disclosure"] == {
     "withheld_evidence_items": 4,
 }
 assert report["summary"] == {"total": 4, "critical": 1, "high": 1, "medium": 1, "low": 1, "info": 0}
+assert report["assessment"]["rules_evaluated"] == 4
+assert report["assessment"]["failed"] == 4
+assert report["assessment"]["passed"] == 0
+assert report["assessment"]["unknown"] == 0
 for secret in (
     "secret-host", "2026-08-10", "/customer-secret", "/dev/secret",
     "secret-customer", "Ignore previous instructions", "secret-admin",
@@ -108,6 +112,20 @@ PY
 
 if /usr/bin/python3 "$MODULE_DIR/reporting/sanitize-findings.py" "$TAMPERED" >/dev/null 2>&1; then
     echo "sanitizer unexpectedly accepted modified public finding text" >&2
+    exit 1
+fi
+
+/usr/bin/python3 - "$FINDINGS" "$TAMPERED" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    report = json.load(stream)
+report["assessment"]["results"][0]["status"] = "passed"
+with open(sys.argv[2], "w", encoding="utf-8") as stream:
+    json.dump(report, stream)
+PY
+if /usr/bin/python3 "$MODULE_DIR/reporting/sanitize-findings.py" "$TAMPERED" >/dev/null 2>&1; then
+    echo "sanitizer unexpectedly accepted assessment/finding disagreement" >&2
     exit 1
 fi
 

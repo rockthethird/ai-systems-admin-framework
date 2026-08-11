@@ -4,7 +4,7 @@
   "title": "AI Auditor Findings Report v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "generated_at", "source", "analysis", "summary", "findings"],
+  "required": ["schema_version", "generated_at", "source", "analysis", "assessment", "summary", "findings"],
   "properties": {
     "schema_version": {"const": "ai-auditor-findings/v1"},
     "generated_at": {"type": "string", "format": "date-time"},
@@ -30,6 +30,7 @@
         "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
       }
     },
+    "assessment": {"$ref": "#/$defs/assessment"},
     "summary": {
       "type": "object",
       "additionalProperties": false,
@@ -49,6 +50,27 @@
     }
   },
   "$defs": {
+    "assessment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["rules_evaluated", "passed", "failed", "unknown", "results"],
+      "properties": {
+        "rules_evaluated": {"type": "integer", "minimum": 1},
+        "passed": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0},
+        "unknown": {"type": "integer", "minimum": 0},
+        "results": {"type": "array", "minItems": 1, "items": {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "control", "section", "status", "summary"],
+          "properties": {
+            "id": {"type": "string", "pattern": "^AIA-[0-9]{4}$"},
+            "control": {"type": "string", "minLength": 1},
+            "section": {"type": "string", "minLength": 1},
+            "status": {"enum": ["passed", "failed", "unknown"]},
+            "summary": {"type": ["string", "null"]}
+          }
+        }}
+      }
+    },
     "finding": {
       "type": "object",
       "additionalProperties": false,

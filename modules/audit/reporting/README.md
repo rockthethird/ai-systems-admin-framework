@@ -12,6 +12,7 @@ Version 1 records:
 
 - inventory provenance and an optional SHA-256 digest,
 - analysis engine, model, prompt version, and limitations,
+- explicit rule coverage with passed, failed, and unknown outcomes,
 - severity totals,
 - stable finding identifiers and lifecycle status,
 - confidence and sensitivity classifications,
@@ -37,6 +38,7 @@ The external-safe sanitizer:
 - rejects unknown rules, altered public text, duplicate IDs, and inconsistent summaries,
 - withholds host identity, collection timestamps, evidence paths, and evidence observations,
 - retains content hashes, severity totals, confidence, controlled evidence sections, and withheld-item counts,
+- retains the complete known-rule manifest and validates each failed outcome against an emitted finding,
 - marks evidence quality degraded when the analyzer reports incomplete collection.
 
 This is a default data-minimization guardrail. It becomes a hard confidentiality boundary only when Hermes cannot bypass it through unrestricted SSH, Docker, filesystem, or other host access.
@@ -80,4 +82,4 @@ Generate an initial deterministic report without elevated privileges:
 modules/audit/reporting/analyze-inventory.py inventory.json --output findings.json
 ```
 
-The initial static rules flag filesystems at or above 90% utilization, failed systemd units, additional UID 0 accounts, and incomplete collection evidence. Rule IDs are stable. The analyzer and sanitizer perform no subprocess or network operations. The controller helper invokes those two pinned local programs; the installed endpoint additionally invokes the fixed root-only collector.
+The initial static rules evaluate filesystems at or above 90% utilization, failed systemd units, additional UID 0 accounts, and incomplete collection evidence. Every rule is reported as passed, failed, or unknown; zero findings therefore no longer hides which controls were actually assessed. Rule IDs are stable. The analyzer and sanitizer perform no subprocess or network operations. The controller helper invokes those two pinned local programs; the installed endpoint additionally invokes the fixed root-only collector.

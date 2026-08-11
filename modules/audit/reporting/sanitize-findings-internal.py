@@ -43,6 +43,36 @@ def require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
+def sanitize_assessment(report: dict[str, Any], failed_ids: set[str]) -> dict[str, Any]:
+    assessment = report.get("assessment")
+    require(isinstance(assessment, dict), "assessment must be an object")
+    results = assessment.get("results")
+    require(isinstance(results, list) and len(results) == len(PUBLIC_RULES),
+            "assessment must cover every supported rule")
+    safe_results = []
+    seen = set()
+    counts = {status: 0 for status in ("passed", "failed", "unknown")}
+    for result in results:
+        require(isinstance(result, dict), "assessment result must be an object")
+        identifier = result.get("id")
+        require(identifier in PUBLIC_RULES and identifier not in seen,
+                f"unsupported or duplicate assessment rule: {identifier}")
+        seen.add(identifier)
+        status = result.get("status")
+        require(status in counts and (status == "failed") == (identifier in failed_ids),
+                f"assessment rule {identifier} disagrees with findings")
+        control = result.get("control")
+        section = result.get("section")
+        require(isinstance(control, str) and control and isinstance(section, str) and section,
+                f"assessment rule {identifier} has invalid metadata")
+        counts[status] += 1
+        safe_results.append({"id": identifier, "control": control, "section": section, "status": status})
+    require(seen == set(PUBLIC_RULES) and assessment.get("rules_evaluated") == len(results) and
+            all(assessment.get(status) == count for status, count in counts.items()),
+            "assessment coverage or counts are invalid")
+    return {"rules_evaluated": len(results), **counts, "results": safe_results}
+
+
 def safe_detail(identifier: str, item: dict[str, Any]) -> str:
     observation = item.get("observation")
     require(isinstance(observation, str), f"finding {identifier} has invalid observation")
@@ -129,6 +159,7 @@ def sanitize(raw_report: bytes) -> dict[str, Any]:
     require(isinstance(collected_at, str) and collected_at, "source collected_at is invalid")
     require(isinstance(digest, str) and re.fullmatch(r"[a-f0-9]{64}", digest) is not None,
             "source inventory_sha256 is invalid")
+    safe_assessment = sanitize_assessment(report, seen)
     return {
         "schema_version": OUTPUT_SCHEMA,
         "profile": PROFILE,
@@ -158,6 +189,7 @@ def sanitize(raw_report: bytes) -> dict[str, Any]:
                 "Recommendations require human review and grant no execution authority",
             ],
         },
+        "assessment": safe_assessment,
         "summary": expected_summary,
         "findings": safe_findings,
     }
