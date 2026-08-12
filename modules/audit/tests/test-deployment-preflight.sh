@@ -6,8 +6,9 @@ readonly MODULE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 readonly DEPLOY="$MODULE_DIR/deploy/scripts/deploy.sh"
 readonly POLICY="$MODULE_DIR/deploy/scripts/policy.py"
 readonly DIRTY_MARKER="$MODULE_DIR/.deployment-preflight-dirty-test"
+readonly UNRELATED_ARTIFACT="$MODULE_DIR/deploy/artifacts/unrelated-test-link"
 readonly TEMP_DIR="$(mktemp -d)"
-trap 'rm -f "$DIRTY_MARKER"; rm -rf "$TEMP_DIR"' EXIT
+trap 'rm -f "$DIRTY_MARKER" "$UNRELATED_ARTIFACT"; rm -rf "$TEMP_DIR"' EXIT
 
 "$DEPLOY" --help >/dev/null
 if "$DEPLOY" --unknown >/dev/null 2>&1; then
@@ -39,8 +40,18 @@ if sudo -n "$DEPLOY" --check >/dev/null 2>&1; then
 fi
 sudo -n "$DEPLOY" --check --allow-dirty >/dev/null
 
-if printf '\n' | sudo -n "$DEPLOY" --allow-dirty >/dev/null 2>&1; then
+ln -s /path/not-used-by-deployment "$UNRELATED_ARTIFACT"
+sudo -n "$DEPLOY" --check --allow-dirty >/dev/null
+
+if printf '\n' | script -qfec "sudo -n '$DEPLOY'" \
+        "$TEMP_DIR/dirty-prompt.log" >/dev/null 2>&1; then
     echo "interactive deployment accepted the default response" >&2
+    exit 1
+fi
+grep -Fq 'Continue with an uncommitted deployment? [y/N]' "$TEMP_DIR/dirty-prompt.log"
+if sudo -n "$DEPLOY" --non-interactive \
+        --approved-sha256 "$bundle_sha256" >/dev/null 2>&1; then
+    echo "noninteractive deployment accepted a dirty tree without override" >&2
     exit 1
 fi
 if sudo -n "$DEPLOY" --allow-dirty --non-interactive \

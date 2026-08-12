@@ -22,7 +22,9 @@ if [ -e "$ARTIFACTS/artifact-index.json" ] || [ -e "$STATE/policy-approval.json"
     exit 1
 fi
 
-python3 "$COMPILER" build --policy-dir "$POLICY" --artifacts-dir "$ARTIFACTS" >/dev/null
+build_output="$(python3 "$COMPILER" build --policy-dir "$POLICY" \
+    --artifacts-dir "$ARTIFACTS" --state-dir "$STATE")"
+grep -Fq 'human_approval_status: REQUIRED' <<<"$build_output"
 bundle_sha256="$(sha256sum "$ARTIFACTS/artifact-index.json" | cut -d' ' -f1)"
 
 printf '%s\n' "$bundle_sha256" | script -qfec \
@@ -40,6 +42,9 @@ test "$(stat -c %a "$STATE")" = "700"
 test "$(stat -c %a "$STATE/policy-approval.json")" = "600"
 python3 "$COMPILER" verify --policy-dir "$POLICY" \
     --artifacts-dir "$ARTIFACTS" --state-dir "$STATE" >/dev/null
+build_output="$(python3 "$COMPILER" build --policy-dir "$POLICY" \
+    --artifacts-dir "$ARTIFACTS" --state-dir "$STATE")"
+grep -Fq 'human_approval_status: MATCHED' <<<"$build_output"
 
 cp "$STATE/policy-approval.json" "$TEMP_DIR/approval"
 printf '%s\n' incorrect-digest | script -qfec \
@@ -57,6 +62,9 @@ fi
 cp "$TEMP_DIR/sudoers" "$ARTIFACTS/sudoers-ai-auditor"
 
 printf '\n' >> "$POLICY/identities.yaml"
+build_output="$(python3 "$COMPILER" build --policy-dir "$POLICY" \
+    --artifacts-dir "$ARTIFACTS" --state-dir "$STATE")"
+grep -Fq 'human_approval_status: STALE' <<<"$build_output"
 if python3 "$COMPILER" verify --policy-dir "$POLICY" \
         --artifacts-dir "$ARTIFACTS" --state-dir "$STATE" >/dev/null 2>&1; then
     echo "verification accepted stale approval after policy change" >&2

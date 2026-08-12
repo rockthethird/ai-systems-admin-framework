@@ -76,7 +76,22 @@ validate_source_tree() {
             || fail "deployment tree has inconsistent ownership: $path"
         mode="$(stat -c %a "$path")"
         (( (8#$mode & 8#022) == 0 )) || fail "deployment tree entry is group/other writable: $path"
-    done < <(find "$DEPLOY_DIR" -print0)
+    done < <(find "$DEPLOY_DIR" \
+        -path "$ARTIFACTS_DIR" -prune -print0 -o -print0)
+
+    [[ ! -L "$ARTIFACTS_DIR" && -d "$ARTIFACTS_DIR" ]] \
+        || fail "artifacts path must be a directory: $ARTIFACTS_DIR"
+    [[ "$(stat -c %u "$ARTIFACTS_DIR")" == "$owner_uid" ]] \
+        || fail "artifacts directory has inconsistent ownership"
+    [[ "$(stat -c %a "$ARTIFACTS_DIR")" == 755 ]] \
+        || fail "artifacts directory must have mode 0755"
+    for path in artifact-index.json policy-manifest.json sudoers-ai-auditor; do
+        path="$ARTIFACTS_DIR/$path"
+        [[ -f "$path" && ! -L "$path" ]] \
+            || fail "required artifact must be a regular file: $path"
+        [[ "$(stat -c %u "$path")" == "$owner_uid" && "$(stat -c %a "$path")" == 644 ]] \
+            || fail "required artifact must match policy owner and mode 0644: $path"
+    done
 
     [[ "$(stat -c %a "$SCRIPT_DIR/deploy.sh")" == 755 ]] \
         || fail "deploy.sh must have mode 0755"
@@ -89,7 +104,7 @@ validate_source_tree() {
 }
 
 validate_git_state() {
-    local resolved status commit
+    local resolved status commit response
     if ! resolved="$(git -c safe.directory="$REPO_ROOT" -C "$REPO_ROOT" rev-parse --show-toplevel 2>/dev/null)" \
             || [[ "$resolved" != "$REPO_ROOT" ]]; then
         [[ "$ALLOW_UNVERSIONED" == true ]] \
@@ -102,11 +117,19 @@ validate_git_state() {
     status="$(git -c safe.directory="$REPO_ROOT" -C "$REPO_ROOT" status --porcelain)"
     echo "Git commit: $commit"
     if [[ -n "$status" ]]; then
-        [[ "$ALLOW_DIRTY" == true ]] || {
-            printf '%s\n' "$status" >&2
+        printf '%s\n' "$status" >&2
+        if [[ "$ALLOW_DIRTY" == true ]]; then
+            echo "WARNING: Git working tree is dirty (--allow-dirty)."
+        elif [[ "$CHECK_ONLY" == true || "$NON_INTERACTIVE" == true ]]; then
             fail "Git working tree is dirty; use --allow-dirty to test this patch"
-        }
-        echo "WARNING: Git working tree is dirty (--allow-dirty)."
+        else
+            echo "WARNING: Deployment may include code that has not been committed or reviewed."
+            read -r -p "Continue with an uncommitted deployment? [y/N] " response \
+                || response=""
+            [[ "${response,,}" == y || "${response,,}" == yes ]] \
+                || fail "deployment aborted"
+            echo "WARNING: Continuing with an interactively accepted dirty tree."
+        fi
     else
         echo "Git working tree: clean"
     fi

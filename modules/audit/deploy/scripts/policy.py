@@ -283,19 +283,12 @@ def validate_approval_storage(policy_dir: Path, state_dir: Path) -> None:
         fail(f"approval record must be owned by policy owner with mode 0600: {record_path}")
 
 
-def verify(policy_dir: Path, artifacts_dir: Path, state_dir: Path) -> tuple[str, str]:
-    contents, index, policy_digest = expected_bundle(policy_dir)
-    for name, expected in contents.items():
-        if regular_file_bytes(artifacts_dir / name) != expected:
-            fail(f"artifact does not match validated policy: {artifacts_dir / name}")
-    if regular_file_bytes(artifacts_dir / "artifact-index.json") != index:
-        fail("artifact index does not match the reconstructed bundle")
-
+def validate_approval(policy_dir: Path, state_dir: Path, policy_digest: str,
+                      bundle_digest: str) -> None:
     validate_approval_storage(policy_dir, state_dir)
     approval = json.loads(regular_file_bytes(approval_path(state_dir)))
     if not isinstance(approval, dict):
         fail("approval record must be a JSON object")
-    bundle_digest = sha256(index)
     expected_approval = {
         "policy_sha256": policy_digest,
         "bundle_sha256": bundle_digest,
@@ -316,6 +309,31 @@ def verify(policy_dir: Path, artifacts_dir: Path, state_dir: Path) -> tuple[str,
     expected_approver = pwd.getpwuid(policy_dir.stat().st_uid).pw_name
     if approval["approved_by"] != expected_approver:
         fail("approval identity does not match the policy-directory owner")
+
+
+def human_approval_status(policy_dir: Path, state_dir: Path, policy_digest: str,
+                          bundle_digest: str) -> str:
+    if not os.path.lexists(approval_path(state_dir)):
+        return "REQUIRED"
+    try:
+        validate_approval(policy_dir, state_dir, policy_digest, bundle_digest)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return "STALE"
+    return "MATCHED"
+
+
+def verify(policy_dir: Path, artifacts_dir: Path, state_dir: Path) -> tuple[str, str]:
+    contents, index, policy_digest = expected_bundle(policy_dir)
+    for name, expected in contents.items():
+        if regular_file_bytes(artifacts_dir / name) != expected:
+            fail(f"artifact does not match validated policy: {artifacts_dir / name}")
+    if regular_file_bytes(artifacts_dir / "artifact-index.json") != index:
+        fail("artifact index does not match the reconstructed bundle")
+
+    bundle_digest = sha256(index)
+    status = human_approval_status(policy_dir, state_dir, policy_digest, bundle_digest)
+    if status != "MATCHED":
+        fail(f"human approval does not match the current bundle: {status}")
     return policy_digest, bundle_digest
 
 
@@ -404,18 +422,17 @@ def parse_args() -> argparse.Namespace:
     deploy_dir = Path(__file__).resolve().parent.parent
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    def paths(command: argparse.ArgumentParser, include_state: bool = False) -> None:
+    def paths(command: argparse.ArgumentParser) -> None:
         command.add_argument("--policy-dir", type=Path, default=deploy_dir / "policy")
         command.add_argument("--artifacts-dir", type=Path, default=deploy_dir / "artifacts")
-        if include_state:
-            command.add_argument("--state-dir", type=Path, default=deploy_dir / ".state")
+        command.add_argument("--state-dir", type=Path, default=deploy_dir / ".state")
 
     build_parser = commands.add_parser("build", help="build and validate deployment artifacts")
     paths(build_parser)
     verify_parser = commands.add_parser("verify", help="verify the bundle and its approval")
-    paths(verify_parser, include_state=True)
+    paths(verify_parser)
     review_parser = commands.add_parser("review", help="review and approve exact artifact bytes")
-    paths(review_parser, include_state=True)
+    paths(review_parser)
     return parser.parse_args()
 
 
@@ -426,17 +443,18 @@ def main() -> int:
             policy_digest, bundle_digest = build(args.policy_dir, args.artifacts_dir)
             print(f"policy_sha256: {policy_digest}")
             print(f"bundle_sha256: {bundle_digest}")
-            print("approval_status: UNAPPROVED")
+            print("human_approval_status: " + human_approval_status(
+                args.policy_dir, args.state_dir, policy_digest, bundle_digest))
         elif args.command == "verify":
             policy_digest, bundle_digest = verify(args.policy_dir, args.artifacts_dir, args.state_dir)
             print(f"policy_sha256: {policy_digest}")
             print(f"bundle_sha256: {bundle_digest}")
-            print("approval_status: APPROVED")
+            print("human_approval_status: MATCHED")
         elif args.command == "review":
             policy_digest, bundle_digest = review(args.policy_dir, args.artifacts_dir, args.state_dir)
             print(f"policy_sha256: {policy_digest}")
             print(f"bundle_sha256: {bundle_digest}")
-            print("approval_status: APPROVED")
+            print("human_approval_status: MATCHED")
     except (OSError, ValueError, yaml.YAMLError, json.JSONDecodeError,
             jsonschema.SchemaError, jsonschema.ValidationError) as exc:
         print(f"policy command failed: {exc}", file=sys.stderr)

@@ -31,12 +31,16 @@ they are not independent operator entry points. Preflight completes before any
 permanent change. Each artifact is verified again immediately before its
 installing stage, and each file is activated through an atomic rename.
 
-A dirty Git checkout aborts unless `--allow-dirty` is explicit. Source without
-usable Git metadata aborts unless `--allow-unversioned` is explicit. Automation
-must additionally provide both `--non-interactive` and
-`--approved-sha256 DIGEST`; this bypasses only the final confirmation.
+An interactive deployment warns on a dirty Git checkout and defaults to abort;
+the administrator may explicitly answer `y` or `yes` to test the patch.
+`--check` and noninteractive deployment require `--allow-dirty`. Source without
+usable Git metadata always requires `--allow-unversioned`. Automation must
+additionally provide both `--non-interactive` and `--approved-sha256 DIGEST`;
+this bypasses only the final confirmation.
 
-Stop here before configuring SSH. The existing key and SSH-hardening scripts target the legacy `ai-auditor` identity and must not be applied to the two report identities until profile-specific key and forced-command binding is designed.
+Stop here before configuring SSH. Profile-specific key and forced-command
+binding is not implemented; its required security properties are defined in
+[`../docs/THREAT-MODEL.md`](../docs/THREAT-MODEL.md).
 
 The sudoers deployment requires `visudo`; skipping validation is not an acceptable production path.
 
