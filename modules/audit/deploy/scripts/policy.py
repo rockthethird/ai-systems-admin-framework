@@ -4,10 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 import hashlib
 import json
 import os
+import pwd
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -19,6 +22,7 @@ import yaml
 
 MANIFEST_VERSION = "ai-auditor-policy-manifest/v1"
 INDEX_VERSION = "ai-auditor-artifact-index/v1"
+APPROVAL_FILE = "policy-approval.json"
 POLICY_FILES = {
     "collectors": ("collectors.yaml", "collectors-v1.schema.json"),
     "identities": ("identities.yaml", "identities-v1.schema.json"),
@@ -217,28 +221,32 @@ def build_index(policy_sha256: str, contents: dict[str, bytes]) -> bytes:
     })
 
 
-def write_staged(path: Path, content: bytes) -> None:
-    path.write_bytes(content)
-    path.chmod(0o644)
-
-
-def build(policy_dir: Path, artifacts_dir: Path) -> tuple[str, str]:
+def render_bundle(policy_dir: Path, validation_dir: Path) -> tuple[dict[str, bytes], bytes, str]:
     documents, policy_digest = load_policy(policy_dir)
     validate_policy(documents)
     contents = {
         "policy-manifest.json": compile_manifest(documents),
         "sudoers-ai-auditor": render_sudoers(documents),
     }
+    sudoers = validation_dir / "sudoers-ai-auditor"
+    write_staged(sudoers, contents["sudoers-ai-auditor"])
+    validate_sudoers(sudoers)
+    return contents, build_index(policy_digest, contents), policy_digest
 
+
+def write_staged(path: Path, content: bytes) -> None:
+    path.write_bytes(content)
+    path.chmod(0o644)
+
+
+def build(policy_dir: Path, artifacts_dir: Path) -> tuple[str, str]:
     artifacts_dir.mkdir(parents=True, exist_ok=True, mode=0o755)
     artifacts_dir.chmod(0o755)
     with tempfile.TemporaryDirectory(prefix=".build-", dir=artifacts_dir) as temporary:
         stage_dir = Path(temporary)
+        contents, index, policy_digest = render_bundle(policy_dir, stage_dir)
         for name, content in contents.items():
             write_staged(stage_dir / name, content)
-        validate_sudoers(stage_dir / "sudoers-ai-auditor")
-
-        index = build_index(policy_digest, contents)
         write_staged(stage_dir / "artifact-index.json", index)
         for name in ARTIFACTS:
             os.replace(stage_dir / name, artifacts_dir / name)
@@ -247,13 +255,167 @@ def build(policy_dir: Path, artifacts_dir: Path) -> tuple[str, str]:
     return policy_digest, sha256(index)
 
 
+def expected_bundle(policy_dir: Path) -> tuple[dict[str, bytes], bytes, str]:
+    with tempfile.TemporaryDirectory(prefix="ai-auditor-verify-") as temporary:
+        return render_bundle(policy_dir, Path(temporary))
+
+
+def regular_file_bytes(path: Path) -> bytes:
+    if path.is_symlink() or not path.is_file():
+        fail(f"required artifact is not a regular file: {path}")
+    return path.read_bytes()
+
+
+def approval_path(state_dir: Path) -> Path:
+    return state_dir / APPROVAL_FILE
+
+
+def validate_approval_storage(policy_dir: Path, state_dir: Path) -> None:
+    policy_owner = policy_dir.stat().st_uid
+    if state_dir.is_symlink() or not state_dir.is_dir():
+        fail(f"approval state directory is missing or invalid: {state_dir}")
+    state = state_dir.stat()
+    if state.st_uid != policy_owner or stat.S_IMODE(state.st_mode) != 0o700:
+        fail(f"approval state directory must be owned by policy owner with mode 0700: {state_dir}")
+    record_path = approval_path(state_dir)
+    record = record_path.stat()
+    if record.st_uid != policy_owner or stat.S_IMODE(record.st_mode) != 0o600:
+        fail(f"approval record must be owned by policy owner with mode 0600: {record_path}")
+
+
+def verify(policy_dir: Path, artifacts_dir: Path, state_dir: Path) -> tuple[str, str]:
+    contents, index, policy_digest = expected_bundle(policy_dir)
+    for name, expected in contents.items():
+        if regular_file_bytes(artifacts_dir / name) != expected:
+            fail(f"artifact does not match validated policy: {artifacts_dir / name}")
+    if regular_file_bytes(artifacts_dir / "artifact-index.json") != index:
+        fail("artifact index does not match the reconstructed bundle")
+
+    validate_approval_storage(policy_dir, state_dir)
+    approval = json.loads(regular_file_bytes(approval_path(state_dir)))
+    if not isinstance(approval, dict):
+        fail("approval record must be a JSON object")
+    bundle_digest = sha256(index)
+    expected_approval = {
+        "policy_sha256": policy_digest,
+        "bundle_sha256": bundle_digest,
+    }
+    for field, expected in expected_approval.items():
+        if approval.get(field) != expected:
+            fail(f"approval {field} does not match the current bundle")
+    if not isinstance(approval.get("approved_at"), str) or not approval["approved_at"]:
+        fail("approval record has no valid approved_at value")
+    if not isinstance(approval.get("approved_by"), str) or not approval["approved_by"]:
+        fail("approval record has no valid approved_by value")
+    if set(approval) != {"policy_sha256", "bundle_sha256", "approved_at", "approved_by"}:
+        fail("approval record contains unexpected fields")
+    try:
+        datetime.datetime.strptime(approval["approved_at"], "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        fail("approval timestamp is not UTC RFC 3339 with whole-second precision")
+    expected_approver = pwd.getpwuid(policy_dir.stat().st_uid).pw_name
+    if approval["approved_by"] != expected_approver:
+        fail("approval identity does not match the policy-directory owner")
+    return policy_digest, bundle_digest
+
+
+def print_review(artifacts_dir: Path, index: bytes, bundle_digest: str) -> None:
+    metadata = {item["file"]: item for item in json.loads(index)["artifacts"]}
+    for name in sorted(ARTIFACTS, key=lambda item: metadata[item]["destination"]):
+        item = metadata[name]
+        print("=" * 78)
+        print(f"ARTIFACT: {name}")
+        print(f"DESTINATION: {item['destination']}")
+        print(f"OWNER: {item['owner']}:{item['group']}")
+        print(f"MODE: {item['mode']}")
+        print(f"SHA256: {item['sha256']}")
+        print("----- EXACT CONTENT BEGINS -----")
+        sys.stdout.write(regular_file_bytes(artifacts_dir / name).decode("utf-8"))
+        print("----- EXACT CONTENT ENDS -----")
+    print("=" * 78)
+    print("ARTIFACT INDEX (exact approved bytes)")
+    print("----- EXACT CONTENT BEGINS -----")
+    sys.stdout.write(index.decode("utf-8"))
+    print("----- EXACT CONTENT ENDS -----")
+    print(f"BUNDLE SHA256: {bundle_digest}")
+
+
+def write_approval(policy_dir: Path, state_dir: Path, policy_digest: str,
+                   bundle_digest: str) -> None:
+    policy_owner = policy_dir.stat().st_uid
+    if os.geteuid() != policy_owner:
+        fail("review must run as the account that owns the policy directory")
+    state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if state_dir.is_symlink() or not state_dir.is_dir():
+        fail(f"approval state path is not a directory: {state_dir}")
+    if state_dir.stat().st_uid != policy_owner:
+        fail("approval state directory is not owned by the policy owner")
+    state_dir.chmod(0o700)
+
+    approved_at = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    record = canonical_json({
+        "policy_sha256": policy_digest,
+        "bundle_sha256": bundle_digest,
+        "approved_at": approved_at.isoformat().replace("+00:00", "Z"),
+        "approved_by": pwd.getpwuid(os.geteuid()).pw_name,
+    })
+    descriptor, temporary = tempfile.mkstemp(prefix=".approval-", dir=state_dir)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(record)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, approval_path(state_dir))
+    except BaseException:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+        Path(temporary).unlink(missing_ok=True)
+        raise
+
+
+def review(policy_dir: Path, artifacts_dir: Path, state_dir: Path) -> tuple[str, str]:
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        fail("review requires an interactive terminal on stdin and stdout")
+    if os.geteuid() != policy_dir.stat().st_uid:
+        fail("review must run as the account that owns the policy directory")
+
+    policy_digest, bundle_digest = build(policy_dir, artifacts_dir)
+    contents, index, expected_policy_digest = expected_bundle(policy_dir)
+    if policy_digest != expected_policy_digest:
+        fail("policy changed while preparing review")
+    for name, expected in contents.items():
+        if regular_file_bytes(artifacts_dir / name) != expected:
+            fail(f"artifact changed while preparing review: {name}")
+    if regular_file_bytes(artifacts_dir / "artifact-index.json") != index:
+        fail("artifact index changed while preparing review")
+
+    print_review(artifacts_dir, index, bundle_digest)
+    entered = input("Type the complete bundle SHA-256 to approve: ").strip()
+    if entered != bundle_digest:
+        fail("bundle digest did not match; approval was not created")
+    write_approval(policy_dir, state_dir, policy_digest, bundle_digest)
+    return policy_digest, bundle_digest
+
+
 def parse_args() -> argparse.Namespace:
     deploy_dir = Path(__file__).resolve().parent.parent
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
+    def paths(command: argparse.ArgumentParser, include_state: bool = False) -> None:
+        command.add_argument("--policy-dir", type=Path, default=deploy_dir / "policy")
+        command.add_argument("--artifacts-dir", type=Path, default=deploy_dir / "artifacts")
+        if include_state:
+            command.add_argument("--state-dir", type=Path, default=deploy_dir / ".state")
+
     build_parser = commands.add_parser("build", help="build and validate deployment artifacts")
-    build_parser.add_argument("--policy-dir", type=Path, default=deploy_dir / "policy")
-    build_parser.add_argument("--artifacts-dir", type=Path, default=deploy_dir / "artifacts")
+    paths(build_parser)
+    verify_parser = commands.add_parser("verify", help="verify the bundle and its approval")
+    paths(verify_parser, include_state=True)
+    review_parser = commands.add_parser("review", help="review and approve exact artifact bytes")
+    paths(review_parser, include_state=True)
     return parser.parse_args()
 
 
@@ -265,9 +427,19 @@ def main() -> int:
             print(f"policy_sha256: {policy_digest}")
             print(f"bundle_sha256: {bundle_digest}")
             print("approval_status: UNAPPROVED")
+        elif args.command == "verify":
+            policy_digest, bundle_digest = verify(args.policy_dir, args.artifacts_dir, args.state_dir)
+            print(f"policy_sha256: {policy_digest}")
+            print(f"bundle_sha256: {bundle_digest}")
+            print("approval_status: APPROVED")
+        elif args.command == "review":
+            policy_digest, bundle_digest = review(args.policy_dir, args.artifacts_dir, args.state_dir)
+            print(f"policy_sha256: {policy_digest}")
+            print(f"bundle_sha256: {bundle_digest}")
+            print("approval_status: APPROVED")
     except (OSError, ValueError, yaml.YAMLError, json.JSONDecodeError,
             jsonschema.SchemaError, jsonschema.ValidationError) as exc:
-        print(f"policy build failed: {exc}", file=sys.stderr)
+        print(f"policy command failed: {exc}", file=sys.stderr)
         return 1
     return 0
 

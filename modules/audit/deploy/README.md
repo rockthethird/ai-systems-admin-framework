@@ -18,6 +18,12 @@ sudo bash modules/audit/deploy/scripts/install-report-runtime.sh
 # Controller: build and validate the manifest and sudoers artifacts
 python3 modules/audit/deploy/scripts/policy.py build
 
+# Controller: inspect exact artifact bytes and approve their bundle digest
+python3 modules/audit/deploy/scripts/policy.py review
+
+# Controller: independently reconstruct and verify the approved bundle
+python3 modules/audit/deploy/scripts/policy.py verify
+
 # Target: validate a root-owned candidate and activate it atomically
 sudo bash modules/audit/deploy/scripts/install-sudoers.sh
 ```
@@ -29,6 +35,10 @@ The sudoers deployment requires `visudo`; skipping validation is not an acceptab
 Sudoers is rendered directly from the validated identity policy. Fixed
 renderer invariants enforce root-only, no-argument endpoints and hardened
 environment defaults; `visudo` must accept the candidate before publication.
+Review requires an interactive terminal and the policy-directory owner. It
+prints each exact artifact with its destination, ownership, mode, and hash,
+then records approval only when the full bundle digest is entered correctly.
+Approval state is local under `.state/` and is never a deployment artifact.
 
 ## Verify
 
