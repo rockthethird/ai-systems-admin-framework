@@ -5,7 +5,7 @@
 #
 # Purpose: Deploy and validate sudoers configuration for ai-auditor
 # Idempotent: Safe to run multiple times (creates backup)
-# Dependencies: 10-create-user.sh and 20-setup-ssh-keys.sh must have run first
+# Dependencies: report identities, installed endpoints, and generated sudoers
 #
 # Usage: sudo bash ./30-configure-sudoers.sh [-v|--verbose] [-h|--help]
 #
@@ -88,7 +88,7 @@ DESCRIPTION
 
 PREREQUISITES
     - Must run with sudo or as root
-    - 10-create-user.sh must have run first
+    - 12-create-report-identities.sh and 15-deploy-inventory-collector.sh must have run first
 
 WORKFLOW
     1. Generate artifact: bash ../build/10-generate-sudoers-from-yaml.sh

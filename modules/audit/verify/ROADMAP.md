@@ -1,72 +1,45 @@
-# Verification Roadmap (Phase 3+)
+# Verification roadmap
 
-This directory is reserved for future testing and verification phases.
+This file lists unimplemented verification work for the current fixed-report,
+identity-bound architecture. It does not claim that proposed checks exist.
 
----
+## Current automated coverage
 
-## Phase 3: Server-Side Verification (Planned)
+- Strict policy schemas, cross-references, and generated-manifest freshness
+- Collector argument rejection, command bounds, timeouts, and resource ceilings
+- Deterministic finding and report schema validation
+- External-safe disclosure and prompt-injection resistance
+- Internal-rich constrained evidence formatting
+- Exact no-argument sudo rules and raw-collector denial
+- Live cross-profile denial and semantic deployment equivalence on the
+  disposable development VM
 
-After deploying sudoers configuration to the server, verification will test:
+## Required before SSH binding
 
-- ✓ Sudo rules are installed correctly
-- ✓ AI Auditor can execute configured commands
-- ✓ Commands execute with correct arguments
-- ✓ Output is captured properly
-- ✓ Permissions are enforced (can't run unauthorized commands)
+- Specify distinct credential ownership and lifecycle for cloud and local use.
+- Generate forced-command configuration from validated identity policy.
+- Validate candidate SSH configuration with `sshd -t` before activation.
+- Test key-only authentication and rejection of password and
+  keyboard-interactive authentication.
+- Test denial of PTY, agent forwarding, port forwarding, X11 forwarding,
+  subsystems, arbitrary commands, and cross-profile requests.
+- Test key revocation and recovery without weakening sudo policy.
 
-### Planned Scripts
+## Required before production claims
 
-```
-10-verify-sudoers-deployment.sh     Check that sudoers file is installed
-20-verify-command-execution.sh      Test that commands actually work
-30-verify-permissions-enforced.sh   Verify access control works
-```
+- Run the complete suite on every supported distribution and SSH/sudo version.
+- Trace the deployed collector's fixed child commands on real systemd and
+  optional Docker paths.
+- Test environment injection, symlink substitution, race conditions, malformed
+  evidence, output exhaustion, timeouts, and interrupted deployment.
+- Verify endpoint, manifest, sudoers, SSH configuration, and credential
+  ownership and modes continuously.
+- Export allowed and denied authentication and sudo events to centralized,
+  tamper-resistant storage with retention and alerting.
+- Exercise credential rotation, revocation, host recovery, and rollback.
 
----
+## Future authorization work
 
-## Phase 4: Dry-Run Testing (Planned)
-
-Safe execution of commands with simulation:
-
-- Read-only commands: Execute and capture output
-- State-modifying commands: Dry-run mode (if supported)
-- Critical commands: Manual approval workflow
-
----
-
-## Phase 5: Approval Workflow (Planned)
-
-Formal command execution approval process:
-
-- Command request from AI Auditor
-- Admin review and approval
-- Execution with audit logging
-- Result notification
-
----
-
-## Current Status
-
-- **Phase 1** ✅ Complete: User creation and SSH setup
-- **Phase 2** ✅ Complete: YAML-driven sudoers generation
-- **Phase 3** 🔄 Planned: Server-side verification
-- **Phase 4** 🔄 Planned: Dry-run testing
-- **Phase 5** 🔄 Planned: Approval workflow
-
----
-
-## Current Workflow
-
-For now, manual testing is required:
-
-```bash
-# On server: test each command
-ssh ai-auditor@server "sudo /usr/bin/uname -a"
-ssh ai-auditor@server "sudo /path/to/other/command"
-
-# Verify output
-# Verify no errors
-# Verify permissions enforced
-```
-
-See [Deploy to Server](../deploy/README.md) for deployment instructions.
+Any drill-down or remediation interface requires a separate threat analysis,
+explicit policy primitive, human-approval model, denial tests, and audit trail.
+It must not expand the fixed report identities implicitly.

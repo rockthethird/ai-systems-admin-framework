@@ -35,6 +35,47 @@ The current Hermes-on-audited-host arrangement is a temporary test topology. Its
 - A deterministic external-safe sanitizer that rejects altered or unknown rule content
 - Root-only temporary raw inventory and findings removed on endpoint exit
 
+## SSH binding requirements
+
+SSH binding is not implemented yet. Its design must preserve the existing
+identity/profile boundary rather than restore general shell access:
+
+- Use a distinct credential for each report identity and profile.
+- Require public-key authentication and disable password and
+  keyboard-interactive authentication for report identities.
+- Force the identity's fixed report command independently of the client command.
+- Disable PTY allocation, agent forwarding, port forwarding, X11 forwarding,
+  and user-controlled environment variables.
+- Restrict key source addresses when stable network topology permits it.
+- Keep homes, `.ssh` directories, and `authorized_keys` owned by the matching
+  identity and non-writable by group or others.
+- Validate proposed SSH configuration with `sshd -t` before atomic activation
+  or reload, and retain a tested administrative recovery session.
+- Define credential ownership, secure storage, rotation, revocation, expiry,
+  and incident-response procedures before production use.
+
+Authentication does not select a caller-provided profile. Each credential maps
+to one operating-system identity, and each identity remains authorized for one
+fixed report endpoint.
+
+## Required adversarial verification
+
+Before production use, automated tests must demonstrate denial of:
+
+- shell, interpreter, pager, editor, and arbitrary sudo execution,
+- appended or substituted command arguments and shell metacharacters,
+- environment injection through `PATH`, `LD_PRELOAD`, `LD_LIBRARY_PATH`,
+  `PYTHONPATH`, locale values, and SSH environment requests,
+- cross-profile access and direct execution of private helpers,
+- PTY, forwarding, subsystem, and interactive-session requests,
+- symlink or ownership substitution of policy, endpoint, key, and temporary
+  files,
+- malformed, oversized, timed-out, and prompt-injection evidence.
+
+Tests must also verify that allowed report execution is logged, denied attempts
+are observable, credentials can be revoked without changing policy, and a
+failed deployment leaves the last validated configuration active.
+
 ## Known limitations
 
 - Root executes Python and several OS utilities, so vulnerabilities in those trusted components remain in scope.
@@ -44,6 +85,7 @@ The current Hermes-on-audited-host arrangement is a temporary test topology. Its
 - SSH restrictions, sudo policy, and collector behavior have not yet been validated across a supported distribution matrix.
 - External-safe sanitization does not prevent bypass while Hermes retains another route to raw host data.
 - The framework does not yet implement drill-down authorization, report signing, remediation, or human approval workflows.
+- SSH credential rotation, revocation, expiry, and forced-command binding are not implemented.
 
 ## Change rule
 
