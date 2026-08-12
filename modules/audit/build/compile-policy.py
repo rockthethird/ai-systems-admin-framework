@@ -26,7 +26,7 @@ EXTERNAL_REQUIRED_EXCLUSIONS = {
 }
 BUILTIN_PARAMETERS = {
     "passwd-entries": set(),
-    "ssh-effective-settings": {"users", "settings"},
+    "ssh-effective-settings": {"users", "settings", "executable_paths"},
     "account-path-metadata": {"users", "relative_paths"},
     "path-metadata": {"paths"},
 }
@@ -78,6 +78,17 @@ def validate(documents: dict[str, Any]) -> None:
                     fail(f"collector {collector['id']} command is not absolute")
                 if any("\x00" in argument for argument in command["args"]):
                     fail(f"collector {collector['id']} contains a NUL argument")
+                if any(token in argument for argument in command["args"]
+                       for token in ("$(", "`", "${", "{{", "}}")):
+                    fail(f"collector {collector['id']} contains interpolation or template syntax")
+                output_mode = command.get("output_mode")
+                if output_mode == "dpkg-package-lines" and not (
+                        command["path"] == "/usr/bin/dpkg-query" and command["args"] == ["-W"]):
+                    fail("dpkg-package-lines is valid only for the fixed dpkg-query command")
+                if output_mode == "docker-json-lines" and not (
+                        command["path"] in {"/usr/bin/docker", "/usr/local/bin/docker"}
+                        and command["args"] == ["ps", "--all", "--no-trunc"]):
+                    fail("docker-json-lines is valid only for the fixed docker ps command")
         else:
             expected = BUILTIN_PARAMETERS[collector["primitive"]]
             actual = set(collector.get("parameters", {}))
@@ -86,6 +97,9 @@ def validate(documents: dict[str, Any]) -> None:
             for value in collector.get("parameters", {}).get("paths", []):
                 if not value.startswith("/"):
                     fail(f"collector {collector['id']} path is not absolute")
+            for value in collector.get("parameters", {}).get("executable_paths", []):
+                if not value.startswith("/"):
+                    fail(f"collector {collector['id']} executable path is not absolute")
 
     for rule in rules:
         if rule["source"] != "all-required-collectors" and rule["source"] not in collector_ids:

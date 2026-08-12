@@ -9,6 +9,16 @@ defaults:
   max_file_bytes: 1048576
 
 collectors:
+  - id: host-uptime
+    type: command
+    candidates:
+      - path: /usr/bin/uptime
+        args: [-p]
+      - path: /bin/uptime
+        args: [-p]
+    parser: lines
+    max_items: 10
+
   - id: filesystems
     type: command
     candidates:
@@ -18,6 +28,33 @@ collectors:
         args: [-P, -T]
     parser: lines
 
+  - id: network-interfaces
+    type: command
+    candidates:
+      - path: /usr/sbin/ip
+        args: [-details, address]
+      - path: /sbin/ip
+        args: [-details, address]
+    parser: lines
+
+  - id: network-routes
+    type: command
+    candidates:
+      - path: /usr/sbin/ip
+        args: [route, show, table, all]
+      - path: /sbin/ip
+        args: [route, show, table, all]
+    parser: lines
+
+  - id: network-listening-sockets
+    type: command
+    candidates:
+      - path: /usr/bin/ss
+        args: [-H, -lntup]
+      - path: /bin/ss
+        args: [-H, -lntup]
+    parser: lines
+
   - id: systemd-failed-units
     type: command
     candidates:
@@ -25,6 +62,48 @@ collectors:
         args: [--no-pager, --plain, --failed]
       - path: /bin/systemctl
         args: [--no-pager, --plain, --failed]
+    parser: lines
+
+  - id: systemd-timers
+    type: command
+    candidates:
+      - path: /usr/bin/systemctl
+        args: [--no-pager, --plain, list-timers, --all]
+      - path: /bin/systemctl
+        args: [--no-pager, --plain, list-timers, --all]
+    parser: lines
+
+  - id: systemd-enabled-units
+    type: command
+    candidates:
+      - path: /usr/bin/systemctl
+        args: [--no-pager, --plain, list-unit-files, --state=enabled]
+      - path: /bin/systemctl
+        args: [--no-pager, --plain, list-unit-files, --state=enabled]
+    parser: lines
+
+  - id: packages
+    type: command
+    candidates:
+      - path: /usr/bin/dpkg-query
+        args: [-W]
+        output_mode: dpkg-package-lines
+      - path: /usr/bin/rpm
+        args: [-qa]
+      - path: /bin/rpm
+        args: [-qa]
+    parser: lines
+
+  - id: containers
+    type: command
+    optional: true
+    candidates:
+      - path: /usr/bin/docker
+        args: [ps, --all, --no-trunc]
+        output_mode: docker-json-lines
+      - path: /usr/local/bin/docker
+        args: [ps, --all, --no-trunc]
+        output_mode: docker-json-lines
     parser: lines
 
   - id: accounts
@@ -41,6 +120,7 @@ collectors:
         - kbdinteractiveauthentication
         - pubkeyauthentication
         - permitrootlogin
+      executable_paths: [/usr/sbin/sshd, /sbin/sshd]
 
   - id: auditor-account-paths
     type: builtin

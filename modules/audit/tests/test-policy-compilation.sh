@@ -11,6 +11,20 @@ python3 "$COMPILER" --check
 python3 "$COMPILER" --output "$TEMP_DIR/manifest.json"
 cmp "$MODULE_DIR/generated/policy-manifest.json" "$TEMP_DIR/manifest.json"
 
+python3 - "$TEMP_DIR/manifest.json" <<'PY'
+import json
+import sys
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+ids = {item["id"] for item in manifest["collectors"]["collectors"]}
+assert ids == {
+    "host-uptime", "filesystems", "network-interfaces", "network-routes",
+    "network-listening-sockets", "systemd-failed-units", "systemd-timers",
+    "systemd-enabled-units", "packages", "containers", "accounts",
+    "ssh-effective-settings", "auditor-account-paths", "report-endpoints",
+}
+print("collector policy coverage passed")
+PY
+
 cp -a "$MODULE_DIR/policy" "$TEMP_DIR/policy"
 python3 - "$TEMP_DIR/policy/profiles.yaml" <<'PY'
 import sys

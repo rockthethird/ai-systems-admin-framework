@@ -5,6 +5,26 @@
         "candidates": [
           {
             "args": [
+              "-p"
+            ],
+            "path": "/usr/bin/uptime"
+          },
+          {
+            "args": [
+              "-p"
+            ],
+            "path": "/bin/uptime"
+          }
+        ],
+        "id": "host-uptime",
+        "max_items": 10,
+        "parser": "lines",
+        "type": "command"
+      },
+      {
+        "candidates": [
+          {
+            "args": [
               "-P",
               "-T"
             ],
@@ -19,6 +39,73 @@
           }
         ],
         "id": "filesystems",
+        "parser": "lines",
+        "type": "command"
+      },
+      {
+        "candidates": [
+          {
+            "args": [
+              "-details",
+              "address"
+            ],
+            "path": "/usr/sbin/ip"
+          },
+          {
+            "args": [
+              "-details",
+              "address"
+            ],
+            "path": "/sbin/ip"
+          }
+        ],
+        "id": "network-interfaces",
+        "parser": "lines",
+        "type": "command"
+      },
+      {
+        "candidates": [
+          {
+            "args": [
+              "route",
+              "show",
+              "table",
+              "all"
+            ],
+            "path": "/usr/sbin/ip"
+          },
+          {
+            "args": [
+              "route",
+              "show",
+              "table",
+              "all"
+            ],
+            "path": "/sbin/ip"
+          }
+        ],
+        "id": "network-routes",
+        "parser": "lines",
+        "type": "command"
+      },
+      {
+        "candidates": [
+          {
+            "args": [
+              "-H",
+              "-lntup"
+            ],
+            "path": "/usr/bin/ss"
+          },
+          {
+            "args": [
+              "-H",
+              "-lntup"
+            ],
+            "path": "/bin/ss"
+          }
+        ],
+        "id": "network-listening-sockets",
         "parser": "lines",
         "type": "command"
       },
@@ -46,6 +133,108 @@
         "type": "command"
       },
       {
+        "candidates": [
+          {
+            "args": [
+              "--no-pager",
+              "--plain",
+              "list-timers",
+              "--all"
+            ],
+            "path": "/usr/bin/systemctl"
+          },
+          {
+            "args": [
+              "--no-pager",
+              "--plain",
+              "list-timers",
+              "--all"
+            ],
+            "path": "/bin/systemctl"
+          }
+        ],
+        "id": "systemd-timers",
+        "parser": "lines",
+        "type": "command"
+      },
+      {
+        "candidates": [
+          {
+            "args": [
+              "--no-pager",
+              "--plain",
+              "list-unit-files",
+              "--state=enabled"
+            ],
+            "path": "/usr/bin/systemctl"
+          },
+          {
+            "args": [
+              "--no-pager",
+              "--plain",
+              "list-unit-files",
+              "--state=enabled"
+            ],
+            "path": "/bin/systemctl"
+          }
+        ],
+        "id": "systemd-enabled-units",
+        "parser": "lines",
+        "type": "command"
+      },
+      {
+        "candidates": [
+          {
+            "args": [
+              "-W"
+            ],
+            "output_mode": "dpkg-package-lines",
+            "path": "/usr/bin/dpkg-query"
+          },
+          {
+            "args": [
+              "-qa"
+            ],
+            "path": "/usr/bin/rpm"
+          },
+          {
+            "args": [
+              "-qa"
+            ],
+            "path": "/bin/rpm"
+          }
+        ],
+        "id": "packages",
+        "parser": "lines",
+        "type": "command"
+      },
+      {
+        "candidates": [
+          {
+            "args": [
+              "ps",
+              "--all",
+              "--no-trunc"
+            ],
+            "output_mode": "docker-json-lines",
+            "path": "/usr/bin/docker"
+          },
+          {
+            "args": [
+              "ps",
+              "--all",
+              "--no-trunc"
+            ],
+            "output_mode": "docker-json-lines",
+            "path": "/usr/local/bin/docker"
+          }
+        ],
+        "id": "containers",
+        "optional": true,
+        "parser": "lines",
+        "type": "command"
+      },
+      {
         "id": "accounts",
         "primitive": "passwd-entries",
         "type": "builtin"
@@ -53,6 +242,10 @@
       {
         "id": "ssh-effective-settings",
         "parameters": {
+          "executable_paths": [
+            "/usr/sbin/sshd",
+            "/sbin/sshd"
+          ],
           "settings": [
             "passwordauthentication",
             "kbdinteractiveauthentication",
@@ -298,7 +491,7 @@
     "version": "ai-auditor-rules/v1"
   },
   "source_sha256": {
-    "collectors.yaml": "e347eca7ac1deea3c69bf0c625bfde4a2a344f224d6d7e7602ea68e13db5bc4c",
+    "collectors.yaml": "0987dd01b7ca51e059f9e535683986b4a7dab91dcda0f3ab81c8baea39f91869",
     "identities.yaml": "f8144e9c3bdc602fcfd15b510f18580c30571cbf9396655ab99b5c940add1234",
     "profiles.yaml": "ed7d839ce133b90139dfd2b925c94ddd982ca8c466202db3c39a320a6404e379",
     "rules.yaml": "ea9507c742036d851315077503b3a7b3bc0dff378c154eb7756325ef7ea32b69"
