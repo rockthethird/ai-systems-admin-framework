@@ -55,12 +55,8 @@ Live authorization and deployment checks are documented in
 - [`Getting started`](docs/GETTING-STARTED.md)
 - [`Audit module`](modules/audit/README.md)
 - [`Threat model`](modules/audit/docs/THREAT-MODEL.md)
-- [`Verification roadmap`](modules/audit/verify/ROADMAP.md)
 - [`Contributing`](CONTRIBUTING.md)
 - [`Security policy`](SECURITY.md)
-
-Git preserves earlier experimental designs. Deleted broad-command and legacy
-SSH procedures are not current operating guidance.
 
 ## License
 

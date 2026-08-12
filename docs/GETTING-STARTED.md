@@ -58,8 +58,8 @@ Then follow the positive and negative checks in
 `modules/audit/deploy/README.md`.
 
 Stop before SSH configuration. Key installation and forced-command binding are
-not implemented. The removed legacy scripts targeted a superseded identity and
-must not be recovered from Git history as deployment instructions.
+not implemented. Follow the binding requirements in the audit threat model
+when that work is designed.
 
 ## Interpret reports
 

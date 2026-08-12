@@ -4,7 +4,7 @@
 
 - Host integrity and availability
 - Root-readable system and infrastructure metadata
-- SSH credentials and the `ai-auditor` identity
+- SSH credentials and the two report identities
 - Sudo policy and audit records
 - Docker daemon metadata, when available
 - Raw inventory and evidence-rich local findings
@@ -76,6 +76,13 @@ Tests must also verify that allowed report execution is logged, denied attempts
 are observable, credentials can be revoked without changing policy, and a
 failed deployment leaves the last validated configuration active.
 
+The complete suite must run against every supported distribution and SSH/sudo
+version. Fixed child commands must be traced on real systemd and optional
+Docker paths. Continuous checks must verify endpoint, manifest, sudoers, SSH
+configuration, credential ownership, and modes. Recovery exercises must cover
+credential rotation, revocation, host recovery, interrupted deployment, and
+rollback without weakening the approved policy.
+
 ## Known limitations
 
 - Root executes Python and several OS utilities, so vulnerabilities in those trusted components remain in scope.
@@ -84,7 +91,7 @@ failed deployment leaves the last validated configuration active.
 - Local sudo logging is not tamper-resistant against a compromised root host.
 - SSH restrictions, sudo policy, and collector behavior have not yet been validated across a supported distribution matrix.
 - External-safe sanitization does not prevent bypass while Hermes retains another route to raw host data.
-- The framework does not yet implement drill-down authorization, report signing, remediation, or human approval workflows.
+- The framework does not yet implement drill-down authorization, report signing, or remediation.
 - SSH credential rotation, revocation, expiry, and forced-command binding are not implemented.
 
 ## Change rule

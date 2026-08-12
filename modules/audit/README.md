@@ -30,14 +30,9 @@ The fixed child-command review and current trace limitations are recorded in [CO
 ```bash
 # On the controller
 python3 modules/audit/deploy/scripts/policy.py build
-bash modules/audit/tests/test-inventory-collector.sh
-bash modules/audit/tests/test-sudoers-generation.sh
-bash modules/audit/tests/test-findings-schema.sh
-bash modules/audit/tests/test-inventory-analysis.sh
-bash modules/audit/tests/test-external-findings-sanitization.sh
-bash modules/audit/tests/test-internal-findings-sanitization.sh
-bash modules/audit/tests/test-policy-compilation.sh
-bash modules/audit/tests/test-policy-review-surface.sh
+for test in modules/audit/tests/test-*.sh; do
+    bash "$test"
+done
 
 # Review and deploy on a disposable target, from the repository root
 python3 modules/audit/deploy/scripts/policy.py review

@@ -69,7 +69,6 @@ Profiles are bound to separate operating-system identities, not selected by call
 
 - `ai-auditor-cloud` can run only the external-safe endpoint.
 - `ai-auditor-local` can run only the internal-rich endpoint.
-- The legacy `ai-auditor` identity has no report sudo capability after migration.
 
 SSH keys and forced-command bindings are intentionally not configured yet.
 

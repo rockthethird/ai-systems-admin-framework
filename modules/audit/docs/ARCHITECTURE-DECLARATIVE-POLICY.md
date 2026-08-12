@@ -1,13 +1,14 @@
 # Declarative Audit Policy Architecture
 
-Status: Accepted for incremental implementation
+Status: Implemented
 
 ## Decision
 
-The audit module will describe privileged collection, deterministic controls,
+The audit module describes privileged collection, deterministic controls,
 report disclosure, and identity capabilities in small YAML policy files. A
-strict controller-side validator will compile those files into one checked-in
-JSON manifest. Target runtimes will consume only that validated manifest.
+strict controller-side tool compiles them into an exact local deployment
+bundle containing the runtime manifest, sudoers policy, and artifact index.
+Target runtimes consume only the validated runtime manifest.
 
 Python remains responsible for security enforcement and a deliberately small
 set of named primitives. YAML selects primitives and supplies bounded data; it
@@ -29,13 +30,13 @@ impact, recommendation, or disclosure classification into Python.
 
 ## Policy sources
 
-- `policy/collectors.yaml` defines fixed collectors, absolute command
+- `deploy/policy/collectors.yaml` defines fixed collectors, absolute command
   candidates, literal arguments, limits, and named parsers.
-- `policy/rules.yaml` defines stable controls, public finding text, evidence
+- `deploy/policy/rules.yaml` defines stable controls, public finding text, evidence
   dependencies, and named evaluators.
-- `policy/profiles.yaml` defines allowed disclosures and named safe evidence
+- `deploy/policy/profiles.yaml` defines allowed disclosures and named safe evidence
   formatters.
-- `policy/identities.yaml` binds operating-system identities to exactly one
+- `deploy/policy/identities.yaml` binds operating-system identities to exactly one
   report profile and no-argument endpoint.
 
 Each file has a strict JSON Schema with `additionalProperties: false`.
@@ -50,9 +51,15 @@ under `deploy/artifacts/` deterministically. These local build outputs are not
 committed. Human review displays their exact bytes and binds approval to the
 complete bundle digest, including installation metadata.
 
-Deployment rejects missing, stale, modified, or unapproved artifacts. The
+Deployment rejects missing, stale, modified, or unmatched artifacts. The
 local artifact index retains policy provenance; the installed runtime manifest
 contains only operational policy consumed by report code.
+
+`policy.py review` requires an interactive terminal, displays the exact bytes
+and installation metadata, and records human approval only after the complete
+bundle digest is entered. `policy.py verify` independently reconstructs the
+expected bundle and requires the human approval record to match. The
+privileged deployment command repeats that verification before installation.
 
 Target report code uses the Python standard library to read JSON. PyYAML and
 JSON Schema are build/test dependencies, not additions to the privileged target
@@ -89,32 +96,33 @@ can follow the boundary from data to code.
 
 Compilation fails for unknown fields or primitives, duplicate IDs, unresolved
 references, invalid limits, non-absolute commands, identity/profile mismatch,
-or forbidden external disclosure. Runtime loading fails for an unsupported
-manifest version or digest mismatch. A failed or unknown dependency cannot be
-reported as a passed control.
+or forbidden external disclosure. Deployment fails for artifact or approval
+digest mismatch. Runtime loading fails for an unsupported or malformed
+manifest. A failed or unknown dependency cannot be reported as a passed
+control.
 
-## Migration strategy
+## Implemented workflow
 
-1. Add policy schemas, representative policy, compilation, and guard tests
-   without changing deployed output.
-2. Move duplicated rule metadata into policy and make analyzer and sanitizers
-   consume the generated manifest.
-3. Replace the two sanitizers with one profile-driven engine and named evidence
-   formatters.
-4. Move fixed collector commands and limits into policy while retaining hard
-   resource ceilings in code.
-5. Generate sudoers and documentation views from the same identity policy.
-6. Remove compatibility definitions only after fixture-corpus equivalence and
-   live authorization tests pass.
+1. `policy.py build` validates policy, renders both deployable artifacts,
+   validates sudoers with `visudo`, and publishes the canonical index last.
+2. `policy.py review` rebuilds, displays, and binds human approval to the exact
+   bundle bytes and installation metadata.
+3. `policy.py verify` reconstructs expected content and requires matching
+   artifacts, metadata, and human approval.
+4. `deploy.sh --check` runs the complete read-only source, policy, runtime, and
+   target preflight.
+5. `deploy.sh` repeats preflight and approval verification before atomic
+   per-stage installation.
 
-Each migration step is independently reviewable and preserves the fixed,
-no-argument public endpoints, root-only helpers, identity-bound profiles,
-local analysis, deterministic findings, and negative authorization tests.
+The workflow preserves fixed no-argument public endpoints, root-only helpers,
+identity-bound profiles, local analysis, deterministic findings, and negative
+authorization tests.
 
 ## Consequences
 
-The project accepts a build step and checked-in generated artifact in exchange
-for a smaller trusted runtime and one authoritative definition of security
-behavior. Generated files are not edited by hand. Policy diffs become the main
-review surface; primitive changes continue to receive conventional code review
-and focused tests.
+The project accepts an explicit build and human-approval step in exchange for a
+smaller trusted runtime and one authoritative definition of security behavior.
+Generated artifacts are local, reproducible, ignored by Git, and never edited
+by hand. Policy diffs remain the main behavioral review surface; primitive and
+deployment-tool changes continue to receive conventional code review and
+focused tests.
