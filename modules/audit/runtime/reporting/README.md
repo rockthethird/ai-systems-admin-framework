@@ -10,9 +10,9 @@ Producing either report grants no execution or remediation authority.
 
 Rule text, control metadata, collector dependencies, and profile selection are
 defined in `../../deploy/policy/`. The reporting runtime reads the prevalidated
-`../../deploy/generated/policy-manifest.json`; it does not duplicate public
-rule text. Run `python3 ../../deploy/scripts/policy.py --check` to verify that
-the generated manifest matches its YAML sources.
+`../../deploy/artifacts/policy-manifest.json`; it does not duplicate public
+rule text. Run `python3 ../../deploy/scripts/policy.py build` to generate and
+validate the local deployment bundle.
 
 Version 1 records:
 

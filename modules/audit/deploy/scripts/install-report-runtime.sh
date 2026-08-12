@@ -11,7 +11,7 @@ readonly SANITIZER_SOURCE="$MODULE_DIR/runtime/reporting/sanitize-findings.py"
 readonly INTERNAL_SANITIZER_SOURCE="$MODULE_DIR/runtime/reporting/sanitize-findings-internal.py"
 readonly POLICY_LOADER_SOURCE="$MODULE_DIR/runtime/reporting/audit_policy.py"
 readonly SANITIZER_COMMON_SOURCE="$MODULE_DIR/runtime/reporting/sanitize_common.py"
-readonly POLICY_MANIFEST_SOURCE="$DEPLOY_DIR/generated/policy-manifest.json"
+readonly POLICY_MANIFEST_SOURCE="$DEPLOY_DIR/artifacts/policy-manifest.json"
 readonly REPORT_SOURCE="$MODULE_DIR/runtime/reporting/ai-auditor-report.sh"
 readonly INTERNAL_REPORT_SOURCE="$MODULE_DIR/runtime/reporting/ai-auditor-report-internal.sh"
 

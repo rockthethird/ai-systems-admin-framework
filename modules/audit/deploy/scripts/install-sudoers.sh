@@ -27,7 +27,7 @@ AI_AUDITOR_USER="ai-auditor"
 readonly AUDITOR_USERS=("ai-auditor-cloud" "ai-auditor-local")
 SUDOERS_DIR="/etc/sudoers.d"
 SUDOERS_FILE="$SUDOERS_DIR/$AI_AUDITOR_USER"
-SUDOERS_DEFAULT="$SCRIPT_DIR/../generated/sudoers-ai-auditor"
+SUDOERS_DEFAULT="$SCRIPT_DIR/../artifacts/sudoers-ai-auditor"
 SUDOERS_BACKUP="$SUDOERS_FILE.backup.$(date +%Y%m%d-%H%M%S)"
 SUDOERS_SOURCE=""  # Set by parameter parsing or default
 SUDOERS_CANDIDATE=""
@@ -68,14 +68,14 @@ SYNOPSIS
     sudo bash ./install-sudoers.sh [-f FILE] [-v|--verbose] [-h|--help]
 
 OPTIONS
-    -f, --file FILE File to deploy (default: deploy/generated/sudoers-ai-auditor)
+    -f, --file FILE File to deploy (default: deploy/artifacts/sudoers-ai-auditor)
     -v, --verbose   Display detailed output for debugging
     -h, --help      Display this help message
 
 EXAMPLES
     sudo bash ./install-sudoers.sh
     sudo bash ./install-sudoers.sh --file /tmp/sudoers-custom
-    sudo bash ./install-sudoers.sh -f ../deploy/generated/sudoers-ai-auditor -v
+    sudo bash ./install-sudoers.sh -f ../deploy/artifacts/sudoers-ai-auditor -v
 
 DESCRIPTION
     Deploys sudoers configuration for ai-auditor with:
@@ -84,14 +84,14 @@ DESCRIPTION
     - Logging: Commands logged to identity-specific sudo logfiles
 
     By default uses:
-    - Generated sudoers: deploy/generated/sudoers-ai-auditor (from build script)
+    - Generated sudoers: deploy/artifacts/sudoers-ai-auditor (from policy.py build)
 
 PREREQUISITES
     - Must run with sudo or as root
     - create-report-identities.sh and install-report-runtime.sh must have run first
 
 WORKFLOW
-    1. Generate artifact: bash generate-sudoers.sh
+    1. Generate artifacts: python3 policy.py build
     2. Deploy generated: sudo bash ./install-sudoers.sh
     3. Or deploy custom: sudo bash ./install-sudoers.sh -f /custom/sudoers
     4. Verify: sudo -l -U ai-auditor-cloud and sudo -l -U ai-auditor-local
@@ -201,7 +201,7 @@ deploy_sudoers() {
     else
         log_error "No sudoers file found:"
         log_error "  Generated: $SUDOERS_DEFAULT"
-        log_error "Run build script first: bash generate-sudoers.sh"
+        log_error "Run the policy builder first: python3 policy.py build"
         return 1
     fi
     

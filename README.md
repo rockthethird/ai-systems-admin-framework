@@ -32,15 +32,15 @@ Current audit behavior is primarily defined by four constrained files:
 - [`profiles.yaml`](modules/audit/deploy/policy/profiles.yaml)
 - [`identities.yaml`](modules/audit/deploy/policy/identities.yaml)
 
-Strict schemas and cross-reference checks compile these into a deterministic,
-checked-in JSON manifest. Privileged enforcement remains in a small set of
+Strict schemas and cross-reference checks compile these into deterministic,
+local deployment artifacts. Privileged enforcement remains in a small set of
 named, tested runtime primitives. See the
 [`declarative-policy architecture decision`](modules/audit/docs/ARCHITECTURE-DECLARATIVE-POLICY.md).
 
 ## Validate
 
 ```bash
-python3 modules/audit/deploy/scripts/policy.py --check
+python3 modules/audit/deploy/scripts/policy.py build
 
 for test in modules/audit/tests/test-*.sh; do
     bash "$test"

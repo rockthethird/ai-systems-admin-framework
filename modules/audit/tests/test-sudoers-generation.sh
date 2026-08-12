@@ -3,10 +3,12 @@ set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly MODULE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-readonly OUTPUT="$(mktemp)"
-trap 'rm -f "$OUTPUT"' EXIT
+readonly TEMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TEMP_DIR"' EXIT
 
-bash "$MODULE_DIR/deploy/scripts/generate-sudoers.sh" --output "$OUTPUT" >/dev/null
+python3 "$MODULE_DIR/deploy/scripts/policy.py" build \
+    --artifacts-dir "$TEMP_DIR/artifacts" >/dev/null
+readonly OUTPUT="$TEMP_DIR/artifacts/sudoers-ai-auditor"
 
 external='ai-auditor-cloud ALL=(root:root) NOPASSWD: /usr/local/libexec/ai-auditor-report ""'
 internal='ai-auditor-local ALL=(root:root) NOPASSWD: /usr/local/libexec/ai-auditor-report-internal ""'
@@ -25,8 +27,10 @@ if grep -Eq '^ai-auditor (ALL|[^-])' "$OUTPUT"; then
     exit 1
 fi
 
-if command -v visudo >/dev/null 2>&1; then
-    visudo -c -f "$OUTPUT" >/dev/null
+if grep -Eq 'Generated at:|20[0-9]{2}-[0-9]{2}-[0-9]{2}' "$OUTPUT"; then
+    echo "generated sudoers contains nondeterministic time metadata" >&2
+    exit 1
 fi
 
+visudo -c -f "$OUTPUT" >/dev/null
 echo "sudoers generation test passed"

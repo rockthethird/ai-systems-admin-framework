@@ -14,7 +14,7 @@ def manifest_path() -> Path:
     installed = Path(__file__).with_name("ai-auditor-policy-manifest.json")
     if installed.exists():
         return installed
-    return Path(__file__).resolve().parent.parent.parent / "deploy" / "generated" / "policy-manifest.json"
+    return Path(__file__).resolve().parent.parent.parent / "deploy" / "artifacts" / "policy-manifest.json"
 
 
 def load_manifest() -> dict[str, Any]:

@@ -32,14 +32,14 @@ templates, regular expressions, Python, or arbitrary expressions.
 From the repository root:
 
 ```bash
-python3 modules/audit/deploy/scripts/policy.py --check
+python3 modules/audit/deploy/scripts/policy.py build
 
 for test in modules/audit/tests/test-*.sh; do
     bash "$test"
 done
 ```
 
-These tests cover policy compilation, stale generated artifacts, collector
+These tests cover deterministic policy compilation, generated artifacts, collector
 bounds, deterministic reports, sanitized disclosure, and sudoers generation.
 They do not replace live authorization testing on each target platform.
 
@@ -50,7 +50,7 @@ Use a snapshot-backed or disposable Linux host:
 ```bash
 sudo bash modules/audit/deploy/scripts/create-report-identities.sh
 sudo bash modules/audit/deploy/scripts/install-report-runtime.sh
-bash modules/audit/deploy/scripts/generate-sudoers.sh
+python3 modules/audit/deploy/scripts/policy.py build
 sudo bash modules/audit/deploy/scripts/install-sudoers.sh
 ```
 

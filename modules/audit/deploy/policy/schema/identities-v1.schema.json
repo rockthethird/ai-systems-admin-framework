@@ -6,12 +6,11 @@
     "version": {"const": "ai-auditor-identities/v1"},
     "identities": {"type": "array", "minItems": 1, "items": {
       "type": "object", "additionalProperties": false,
-      "required": ["user", "profile", "endpoint", "arguments"],
+      "required": ["user", "profile", "endpoint"],
       "properties": {
         "user": {"type": "string", "pattern": "^ai-auditor-[a-z0-9-]+$"},
         "profile": {"enum": ["external-safe/v1", "internal-rich/v1"]},
-        "endpoint": {"type": "string", "pattern": "^/usr/local/libexec/ai-auditor-[a-z-]+$"},
-        "arguments": {"const": "none"}
+        "endpoint": {"type": "string", "pattern": "^/usr/local/libexec/ai-auditor-[a-z-]+$"}
       }
     }}
   }

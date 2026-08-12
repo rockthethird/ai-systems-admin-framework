@@ -67,6 +67,8 @@ build/
 *.o
 *.so
 
+# Some modules define additional build outputs in localized .gitignore files.
+
 # Exception: Track build folders in modules/
 !modules/*/build/
 
