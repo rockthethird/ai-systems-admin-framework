@@ -15,11 +15,11 @@ The AI is not trusted as a system administrator. It may analyze broad evidence, 
   - Inventories host, filesystem, network, systemd, accounts, packages, scheduled-task locations, and optional Docker metadata.
   - Uses absolute child executable paths, a fixed environment, closed stdin, isolated process groups, 10-second timeouts, 1 MiB per-stream caps, and item limits.
   - Rejects all command-line arguments.
-- `modules/audit/deploy/scripts/install-report-runtime.sh`
+- `modules/audit/deploy/scripts/deploy.sh`
   - Validates Python and shell syntax without writing to the source checkout.
   - Installs the collector, analyzer, and sanitizer as root-only helpers and activates the public report endpoint last.
 - The transitional sudoers generator still reads `modules/audit/deploy/policy/enabled-commands.yaml` through `lib/sudoers.sh`. It may contain only the two fixed report endpoints and will be removed when generation consumes the validated identity policy.
-- `modules/audit/deploy/scripts/install-sudoers.sh`
+- `modules/audit/deploy/scripts/policy.py`
   - Resolves its artifact path independently of the caller's working directory.
   - Requires `visudo`, installs a root-owned temporary candidate, validates it before activation, and verifies content, ownership, mode, and syntax.
 - `modules/audit/tests/`
@@ -31,7 +31,7 @@ The AI is not trusted as a system administrator. It may analyze broad evidence, 
 - `modules/audit/runtime/reporting/prepare-external-report.sh` runs local analysis followed by sanitization so raw inventory and evidence-rich findings do not enter the normal model-facing workflow.
 - `modules/audit/runtime/reporting/ai-auditor-report.sh` is the installed AI-facing endpoint. It creates root-only temporary evidence, calls the private collector/analyzer/sanitizer chain, emits only external-safe JSON, and removes intermediate artifacts on exit.
 - `modules/audit/runtime/reporting/ai-auditor-report-internal.sh` emits `internal-rich/v1` for a local model, including exact host identity and constrained finding-relevant evidence labeled as untrusted.
-- `modules/audit/deploy/scripts/create-report-identities.sh` creates locked `ai-auditor-cloud` and `ai-auditor-local` identities without installing SSH keys. Sudo binds each identity to only its matching fixed endpoint; SSH binding is deliberately deferred for design review.
+- `modules/audit/deploy/scripts/deploy.sh` validates the approved bundle and creates locked `ai-auditor-cloud` and `ai-auditor-local` identities without installing SSH keys. Sudo binds each identity to only its matching fixed endpoint; SSH binding is deliberately deferred for design review.
 - `modules/audit/deploy/policy/` is now the primary human-review surface for collectors, rules, disclosure profiles, and identity bindings. Strict schemas and `build/compile-policy.py` produce a deterministic checked-in manifest; YAML cannot contain shell fragments or arbitrary expressions.
 - The analyzer and both sanitizers load public control definitions from that root-owned manifest. Shared fail-closed validation removes duplicated rule text and coverage logic while profile-specific evidence reduction remains explicit.
 

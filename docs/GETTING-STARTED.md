@@ -48,10 +48,10 @@ They do not replace live authorization testing on each target platform.
 Use a snapshot-backed or disposable Linux host:
 
 ```bash
-sudo bash modules/audit/deploy/scripts/create-report-identities.sh
-sudo bash modules/audit/deploy/scripts/install-report-runtime.sh
 python3 modules/audit/deploy/scripts/policy.py build
-sudo bash modules/audit/deploy/scripts/install-sudoers.sh
+python3 modules/audit/deploy/scripts/policy.py review
+sudo modules/audit/deploy/scripts/deploy.sh --check
+sudo modules/audit/deploy/scripts/deploy.sh
 ```
 
 Then follow the positive and negative checks in

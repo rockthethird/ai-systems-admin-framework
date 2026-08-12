@@ -9,12 +9,6 @@ Generated files under `artifacts/` are local deployment inputs and must not
 be edited by hand.
 
 ```bash
-# Target: create locked cloud and local report identities (no SSH keys)
-sudo bash modules/audit/deploy/scripts/create-report-identities.sh
-
-# Target: install root-only audit helpers and the sanitized endpoint
-sudo bash modules/audit/deploy/scripts/install-report-runtime.sh
-
 # Controller: build and validate the manifest and sudoers artifacts
 python3 modules/audit/deploy/scripts/policy.py build
 
@@ -24,9 +18,23 @@ python3 modules/audit/deploy/scripts/policy.py review
 # Controller: independently reconstruct and verify the approved bundle
 python3 modules/audit/deploy/scripts/policy.py verify
 
-# Target: validate a root-owned candidate and activate it atomically
-sudo bash modules/audit/deploy/scripts/install-sudoers.sh
+# Target: run the complete read-only preflight
+sudo modules/audit/deploy/scripts/deploy.sh --check
+
+# Target: repeat preflight, confirm, and deploy all stages
+sudo modules/audit/deploy/scripts/deploy.sh
 ```
+
+The public deployment interface is `scripts/deploy.sh`. Non-executable stage
+libraries under `scripts/lib/` implement identity, runtime, and sudoers work;
+they are not independent operator entry points. Preflight completes before any
+permanent change. Each artifact is verified again immediately before its
+installing stage, and each file is activated through an atomic rename.
+
+A dirty Git checkout aborts unless `--allow-dirty` is explicit. Source without
+usable Git metadata aborts unless `--allow-unversioned` is explicit. Automation
+must additionally provide both `--non-interactive` and
+`--approved-sha256 DIGEST`; this bypasses only the final confirmation.
 
 Stop here before configuring SSH. The existing key and SSH-hardening scripts target the legacy `ai-auditor` identity and must not be applied to the two report identities until profile-specific key and forced-command binding is designed.
 

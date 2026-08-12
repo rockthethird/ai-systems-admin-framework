@@ -39,10 +39,10 @@ bash modules/audit/tests/test-internal-findings-sanitization.sh
 bash modules/audit/tests/test-policy-compilation.sh
 bash modules/audit/tests/test-policy-review-surface.sh
 
-# On a disposable target, from the repository root
-sudo bash modules/audit/deploy/scripts/create-report-identities.sh
-sudo bash modules/audit/deploy/scripts/install-report-runtime.sh
-sudo bash modules/audit/deploy/scripts/install-sudoers.sh
+# Review and deploy on a disposable target, from the repository root
+python3 modules/audit/deploy/scripts/policy.py review
+sudo modules/audit/deploy/scripts/deploy.sh --check
+sudo modules/audit/deploy/scripts/deploy.sh
 
 # Positive and negative authorization checks
 sudo -u ai-auditor-cloud sudo -n /usr/local/libexec/ai-auditor-report
