@@ -45,13 +45,14 @@ compiler.
 ## Compilation and deployment
 
 The compiler validates YAML, resolves references, enforces security invariants,
-and writes `generated/policy-manifest.json` deterministically. The generated
-manifest is committed so policy changes and their resolved result are visible
-in code review.
+and writes the runtime manifest, sudoers policy, and canonical artifact index
+under `deploy/artifacts/` deterministically. These local build outputs are not
+committed. Human review displays their exact bytes and binds approval to the
+complete bundle digest, including installation metadata.
 
-Deployment must reject a missing or stale manifest. Reports will eventually
-include its SHA-256 digest so an operator can identify the exact reviewed policy
-that produced a result.
+Deployment rejects missing, stale, modified, or unapproved artifacts. The
+local artifact index retains policy provenance; the installed runtime manifest
+contains only operational policy consumed by report code.
 
 Target report code uses the Python standard library to read JSON. PyYAML and
 JSON Schema are build/test dependencies, not additions to the privileged target

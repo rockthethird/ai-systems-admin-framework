@@ -52,8 +52,8 @@ caller-controlled argument to sudoers.
 From the repository root:
 
 ```bash
-python3 modules/audit/deploy/scripts/policy.py
-python3 modules/audit/deploy/scripts/policy.py --check
+python3 modules/audit/deploy/scripts/policy.py build
+python3 modules/audit/deploy/scripts/policy.py verify
 
 for test in modules/audit/tests/test-*.sh; do
     bash "$test"

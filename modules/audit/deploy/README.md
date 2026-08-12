@@ -76,4 +76,8 @@ currently provided.
 
 ## Rollback
 
-The sudoers script keeps timestamped backups of an existing rule. Restore a reviewed backup with `install -o root -g root -m 0440`, validate it with `visudo`, and atomically rename it into place. Removing the service account or active sudoers file is destructive and should be done explicitly by an administrator.
+The sudoers deployment stage keeps timestamped backups of an existing rule.
+Restore a reviewed backup with `install -o root -g root -m 0440`, validate it
+with `visudo`, and atomically rename it into place. Removing a service account
+or the active sudoers file is destructive and should be done explicitly by an
+administrator.

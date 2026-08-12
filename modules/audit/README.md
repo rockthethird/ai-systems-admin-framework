@@ -8,7 +8,7 @@ The module creates separate locked `ai-auditor-cloud` and `ai-auditor-local` ide
 
 The report includes explicit passed, failed, and unknown outcomes for nine deterministic controls, including effective SSH policy and the integrity of the report access boundary. Adaptive drill-down and remediation are not implemented. The module is alpha software and is not production-ready.
 
-Human review starts in [`policy/`](policy/). Focused YAML files define current
+Human review starts in [`deploy/policy/`](deploy/policy/). Focused YAML files define current
 collectors, controls, disclosure profiles, and identity bindings; strict schemas
 compile them into local deployment artifacts used by the reporting runtime. See
 [`ARCHITECTURE-DECLARATIVE-POLICY.md`](docs/ARCHITECTURE-DECLARATIVE-POLICY.md).
@@ -60,4 +60,4 @@ SSH key setup and SSH hardening are separate steps; see [deploy/README.md](deplo
 4. Add drill-down collectors only when real audits identify missing evidence.
 5. Add centralized, tamper-resistant logging before making stronger auditability claims.
 
-The local and external-safe report contracts are documented in [reporting/README.md](reporting/README.md).
+The local and external-safe report contracts are documented in [runtime/reporting/README.md](runtime/reporting/README.md).
