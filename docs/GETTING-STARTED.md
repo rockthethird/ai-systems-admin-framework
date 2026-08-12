@@ -18,10 +18,10 @@ modules/audit/docs/ARCHITECTURE-DECLARATIVE-POLICY.md
 The primary behavior review surface is:
 
 ```text
-modules/audit/policy/collectors.yaml
-modules/audit/policy/rules.yaml
-modules/audit/policy/profiles.yaml
-modules/audit/policy/identities.yaml
+modules/audit/deploy/policy/collectors.yaml
+modules/audit/deploy/policy/rules.yaml
+modules/audit/deploy/policy/profiles.yaml
+modules/audit/deploy/policy/identities.yaml
 ```
 
 YAML selects constrained named primitives. It cannot embed shell commands,
@@ -32,7 +32,7 @@ templates, regular expressions, Python, or arbitrary expressions.
 From the repository root:
 
 ```bash
-python3 modules/audit/build/compile-policy.py --check
+python3 modules/audit/deploy/scripts/policy.py --check
 
 for test in modules/audit/tests/test-*.sh; do
     bash "$test"
@@ -48,10 +48,10 @@ They do not replace live authorization testing on each target platform.
 Use a snapshot-backed or disposable Linux host:
 
 ```bash
-sudo bash modules/audit/deploy/12-create-report-identities.sh
-sudo bash modules/audit/deploy/15-deploy-inventory-collector.sh
-bash modules/audit/build/10-generate-sudoers-from-yaml.sh
-sudo bash modules/audit/deploy/30-configure-sudoers.sh
+sudo bash modules/audit/deploy/scripts/create-report-identities.sh
+sudo bash modules/audit/deploy/scripts/install-report-runtime.sh
+bash modules/audit/deploy/scripts/generate-sudoers.sh
+sudo bash modules/audit/deploy/scripts/install-sudoers.sh
 ```
 
 Then follow the positive and negative checks in

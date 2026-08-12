@@ -39,9 +39,9 @@ with open(sys.argv[1], "w", encoding="utf-8") as stream:
     json.dump(inventory, stream)
 PY
 
-/usr/bin/python3 "$MODULE_DIR/reporting/analyze-inventory.py" "$INVENTORY" --output "$REPORT"
+/usr/bin/python3 "$MODULE_DIR/runtime/reporting/analyze-inventory.py" "$INVENTORY" --output "$REPORT"
 
-/usr/bin/python3 - "$MODULE_DIR/reporting/schema/ai-auditor-findings-v1.schema.json" "$REPORT" <<'PY'
+/usr/bin/python3 - "$MODULE_DIR/runtime/reporting/schema/ai-auditor-findings-v1.schema.json" "$REPORT" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -68,7 +68,7 @@ else:
 print("inventory analysis test passed")
 PY
 
-if /usr/bin/python3 "$MODULE_DIR/reporting/analyze-inventory.py" /dev/null >/dev/null 2>&1; then
+if /usr/bin/python3 "$MODULE_DIR/runtime/reporting/analyze-inventory.py" /dev/null >/dev/null 2>&1; then
     echo "analyzer unexpectedly accepted invalid inventory" >&2
     exit 1
 fi

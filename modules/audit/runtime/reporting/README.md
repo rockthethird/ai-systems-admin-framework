@@ -9,10 +9,10 @@ This directory defines two unprivileged output boundaries:
 Producing either report grants no execution or remediation authority.
 
 Rule text, control metadata, collector dependencies, and profile selection are
-defined in `../policy/`. The reporting runtime reads the prevalidated
-`../generated/policy-manifest.json`; it does not duplicate public rule text.
-Run `python3 ../build/compile-policy.py --check` to verify that the committed
-manifest matches its YAML sources.
+defined in `../../deploy/policy/`. The reporting runtime reads the prevalidated
+`../../deploy/generated/policy-manifest.json`; it does not duplicate public
+rule text. Run `python3 ../../deploy/scripts/policy.py --check` to verify that
+the generated manifest matches its YAML sources.
 
 Version 1 records:
 
@@ -32,7 +32,7 @@ Reports should point to the minimum evidence needed to support a finding. Do not
 Raw inventory and full findings remain local. Generate the model-facing document with:
 
 ```bash
-modules/audit/reporting/prepare-external-report.sh inventory.json > external-findings.json
+modules/audit/runtime/reporting/prepare-external-report.sh inventory.json > external-findings.json
 ```
 
 The wrapper analyzes the raw inventory locally, stores its intermediate findings in a mode-restricted temporary file, and emits only the `external-safe/v1` view. Do not give raw inventory or full findings to Hermes before running this step.
@@ -87,7 +87,7 @@ bash modules/audit/tests/test-policy-review-surface.sh
 Generate an initial deterministic report without elevated privileges:
 
 ```bash
-modules/audit/reporting/analyze-inventory.py inventory.json --output findings.json
+modules/audit/runtime/reporting/analyze-inventory.py inventory.json --output findings.json
 ```
 
 The static rules evaluate filesystems at or above 90% utilization, failed systemd units, additional UID 0 accounts, incomplete collection evidence, effective SSH password and root-login policy, auditor interactive shells, report-endpoint integrity, and auditor home and authorized-key permissions. Every rule is reported as passed, failed, or unknown; zero findings therefore no longer hides which controls were actually assessed. Rule IDs are stable. The analyzer and sanitizer perform no subprocess or network operations. The controller helper invokes those two pinned local programs; the installed endpoint additionally invokes the fixed root-only collector.

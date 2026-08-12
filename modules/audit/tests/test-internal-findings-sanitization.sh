@@ -36,10 +36,10 @@ with open(sys.argv[1], "w", encoding="utf-8") as stream:
     json.dump(inventory, stream)
 PY
 
-/usr/bin/python3 "$MODULE_DIR/reporting/analyze-inventory.py" "$INVENTORY" --output "$FINDINGS"
-/usr/bin/python3 "$MODULE_DIR/reporting/sanitize-findings-internal.py" "$FINDINGS" --output "$INTERNAL"
+/usr/bin/python3 "$MODULE_DIR/runtime/reporting/analyze-inventory.py" "$INVENTORY" --output "$FINDINGS"
+/usr/bin/python3 "$MODULE_DIR/runtime/reporting/sanitize-findings-internal.py" "$FINDINGS" --output "$INTERNAL"
 
-/usr/bin/python3 - "$MODULE_DIR/reporting/schema/ai-auditor-internal-findings-v1.schema.json" "$INTERNAL" <<'PY'
+/usr/bin/python3 - "$MODULE_DIR/runtime/reporting/schema/ai-auditor-internal-findings-v1.schema.json" "$INTERNAL" <<'PY'
 import json
 import sys
 from pathlib import Path

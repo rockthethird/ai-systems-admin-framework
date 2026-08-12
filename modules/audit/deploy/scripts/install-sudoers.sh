@@ -7,15 +7,15 @@
 # Idempotent: Safe to run multiple times (creates backup)
 # Dependencies: report identities, installed endpoints, and generated sudoers
 #
-# Usage: sudo bash ./30-configure-sudoers.sh [-v|--verbose] [-h|--help]
+# Usage: sudo bash ./install-sudoers.sh [-v|--verbose] [-h|--help]
 #
 # OPTIONS
 #   -v, --verbose   Display detailed output for debugging
 #   -h, --help      Display this help message
 #
 # Examples:
-#   sudo bash ./30-configure-sudoers.sh
-#   sudo bash ./30-configure-sudoers.sh -v
+#   sudo bash ./install-sudoers.sh
+#   sudo bash ./install-sudoers.sh -v
 #
 ################################################################################
 
@@ -27,7 +27,7 @@ AI_AUDITOR_USER="ai-auditor"
 readonly AUDITOR_USERS=("ai-auditor-cloud" "ai-auditor-local")
 SUDOERS_DIR="/etc/sudoers.d"
 SUDOERS_FILE="$SUDOERS_DIR/$AI_AUDITOR_USER"
-SUDOERS_DEFAULT="$SCRIPT_DIR/../build/sudoers-ai-auditor-generated"
+SUDOERS_DEFAULT="$SCRIPT_DIR/../generated/sudoers-ai-auditor"
 SUDOERS_BACKUP="$SUDOERS_FILE.backup.$(date +%Y%m%d-%H%M%S)"
 SUDOERS_SOURCE=""  # Set by parameter parsing or default
 SUDOERS_CANDIDATE=""
@@ -65,17 +65,17 @@ show_help() {
 Phase 1: Configure Sudoers
 
 SYNOPSIS
-    sudo bash ./30-configure-sudoers.sh [-f FILE] [-v|--verbose] [-h|--help]
+    sudo bash ./install-sudoers.sh [-f FILE] [-v|--verbose] [-h|--help]
 
 OPTIONS
-    -f, --file FILE File to deploy (default: build/sudoers-ai-auditor-generated)
+    -f, --file FILE File to deploy (default: deploy/generated/sudoers-ai-auditor)
     -v, --verbose   Display detailed output for debugging
     -h, --help      Display this help message
 
 EXAMPLES
-    sudo bash ./30-configure-sudoers.sh
-    sudo bash ./30-configure-sudoers.sh --file /tmp/sudoers-custom
-    sudo bash ./30-configure-sudoers.sh -f ../build/sudoers-ai-auditor-generated -v
+    sudo bash ./install-sudoers.sh
+    sudo bash ./install-sudoers.sh --file /tmp/sudoers-custom
+    sudo bash ./install-sudoers.sh -f ../deploy/generated/sudoers-ai-auditor -v
 
 DESCRIPTION
     Deploys sudoers configuration for ai-auditor with:
@@ -84,16 +84,16 @@ DESCRIPTION
     - Logging: Commands logged to identity-specific sudo logfiles
 
     By default uses:
-    - Generated sudoers: build/sudoers-ai-auditor-generated (from build script)
+    - Generated sudoers: deploy/generated/sudoers-ai-auditor (from build script)
 
 PREREQUISITES
     - Must run with sudo or as root
-    - 12-create-report-identities.sh and 15-deploy-inventory-collector.sh must have run first
+    - create-report-identities.sh and install-report-runtime.sh must have run first
 
 WORKFLOW
-    1. Generate artifact: bash ../build/10-generate-sudoers-from-yaml.sh
-    2. Deploy generated: sudo bash ./30-configure-sudoers.sh
-    3. Or deploy custom: sudo bash ./30-configure-sudoers.sh -f /custom/sudoers
+    1. Generate artifact: bash generate-sudoers.sh
+    2. Deploy generated: sudo bash ./install-sudoers.sh
+    3. Or deploy custom: sudo bash ./install-sudoers.sh -f /custom/sudoers
     4. Verify: sudo -l -U ai-auditor-cloud and sudo -l -U ai-auditor-local
 
 EOF
@@ -145,7 +145,7 @@ verify_prerequisites() {
     for auditor_user in "${AUDITOR_USERS[@]}"; do
         if ! id "$auditor_user" &>/dev/null; then
             log_error "User '$auditor_user' does not exist"
-            log_error "Please run 12-create-report-identities.sh first"
+            log_error "Please run create-report-identities.sh first"
             return 1
         fi
         log_info "✓ User '$auditor_user' exists"
@@ -201,7 +201,7 @@ deploy_sudoers() {
     else
         log_error "No sudoers file found:"
         log_error "  Generated: $SUDOERS_DEFAULT"
-        log_error "Run build script first: bash ../build/10-generate-sudoers-from-yaml.sh"
+        log_error "Run build script first: bash generate-sudoers.sh"
         return 1
     fi
     

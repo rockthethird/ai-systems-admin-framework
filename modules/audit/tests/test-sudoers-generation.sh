@@ -6,7 +6,7 @@ readonly MODULE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 readonly OUTPUT="$(mktemp)"
 trap 'rm -f "$OUTPUT"' EXIT
 
-bash "$MODULE_DIR/build/10-generate-sudoers-from-yaml.sh" --output "$OUTPUT" >/dev/null
+bash "$MODULE_DIR/deploy/scripts/generate-sudoers.sh" --output "$OUTPUT" >/dev/null
 
 external='ai-auditor-cloud ALL=(root:root) NOPASSWD: /usr/local/libexec/ai-auditor-report ""'
 internal='ai-auditor-local ALL=(root:root) NOPASSWD: /usr/local/libexec/ai-auditor-report-internal ""'

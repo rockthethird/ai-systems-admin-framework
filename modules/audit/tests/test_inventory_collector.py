@@ -6,7 +6,7 @@ import json
 import tempfile
 from pathlib import Path
 
-COLLECTOR = Path(__file__).resolve().parent.parent / "collect" / "ai-auditor-inventory.py"
+COLLECTOR = Path(__file__).resolve().parent.parent / "runtime" / "collect" / "ai-auditor-inventory.py"
 spec = importlib.util.spec_from_file_location("ai_auditor_inventory", COLLECTOR)
 assert spec and spec.loader
 module = importlib.util.module_from_spec(spec)

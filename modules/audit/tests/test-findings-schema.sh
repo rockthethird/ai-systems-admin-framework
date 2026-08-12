@@ -3,8 +3,8 @@ set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly MODULE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-readonly SCHEMA="$MODULE_DIR/reporting/schema/ai-auditor-findings-v1.schema.json"
-readonly EXAMPLE="$MODULE_DIR/reporting/examples/findings-v1.example.json"
+readonly SCHEMA="$MODULE_DIR/runtime/reporting/schema/ai-auditor-findings-v1.schema.json"
+readonly EXAMPLE="$MODULE_DIR/runtime/reporting/examples/findings-v1.example.json"
 
 /usr/bin/python3 - "$SCHEMA" "$EXAMPLE" <<'PY'
 import json

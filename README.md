@@ -27,10 +27,10 @@ authority.
 
 Current audit behavior is primarily defined by four constrained files:
 
-- [`collectors.yaml`](modules/audit/policy/collectors.yaml)
-- [`rules.yaml`](modules/audit/policy/rules.yaml)
-- [`profiles.yaml`](modules/audit/policy/profiles.yaml)
-- [`identities.yaml`](modules/audit/policy/identities.yaml)
+- [`collectors.yaml`](modules/audit/deploy/policy/collectors.yaml)
+- [`rules.yaml`](modules/audit/deploy/policy/rules.yaml)
+- [`profiles.yaml`](modules/audit/deploy/policy/profiles.yaml)
+- [`identities.yaml`](modules/audit/deploy/policy/identities.yaml)
 
 Strict schemas and cross-reference checks compile these into a deterministic,
 checked-in JSON manifest. Privileged enforcement remains in a small set of
@@ -40,7 +40,7 @@ named, tested runtime primitives. See the
 ## Validate
 
 ```bash
-python3 modules/audit/build/compile-policy.py --check
+python3 modules/audit/deploy/scripts/policy.py --check
 
 for test in modules/audit/tests/test-*.sh; do
     bash "$test"

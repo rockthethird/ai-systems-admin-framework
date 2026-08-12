@@ -2,17 +2,18 @@
 set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly MODULE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+readonly MODULE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+readonly DEPLOY_DIR="$MODULE_DIR/deploy"
 readonly LIBEXEC="/usr/local/libexec"
-readonly COLLECTOR_SOURCE="$MODULE_DIR/collect/ai-auditor-inventory.py"
-readonly ANALYZER_SOURCE="$MODULE_DIR/reporting/analyze-inventory.py"
-readonly SANITIZER_SOURCE="$MODULE_DIR/reporting/sanitize-findings.py"
-readonly INTERNAL_SANITIZER_SOURCE="$MODULE_DIR/reporting/sanitize-findings-internal.py"
-readonly POLICY_LOADER_SOURCE="$MODULE_DIR/reporting/audit_policy.py"
-readonly SANITIZER_COMMON_SOURCE="$MODULE_DIR/reporting/sanitize_common.py"
-readonly POLICY_MANIFEST_SOURCE="$MODULE_DIR/generated/policy-manifest.json"
-readonly REPORT_SOURCE="$MODULE_DIR/reporting/ai-auditor-report.sh"
-readonly INTERNAL_REPORT_SOURCE="$MODULE_DIR/reporting/ai-auditor-report-internal.sh"
+readonly COLLECTOR_SOURCE="$MODULE_DIR/runtime/collect/ai-auditor-inventory.py"
+readonly ANALYZER_SOURCE="$MODULE_DIR/runtime/reporting/analyze-inventory.py"
+readonly SANITIZER_SOURCE="$MODULE_DIR/runtime/reporting/sanitize-findings.py"
+readonly INTERNAL_SANITIZER_SOURCE="$MODULE_DIR/runtime/reporting/sanitize-findings-internal.py"
+readonly POLICY_LOADER_SOURCE="$MODULE_DIR/runtime/reporting/audit_policy.py"
+readonly SANITIZER_COMMON_SOURCE="$MODULE_DIR/runtime/reporting/sanitize_common.py"
+readonly POLICY_MANIFEST_SOURCE="$DEPLOY_DIR/generated/policy-manifest.json"
+readonly REPORT_SOURCE="$MODULE_DIR/runtime/reporting/ai-auditor-report.sh"
+readonly INTERNAL_REPORT_SOURCE="$MODULE_DIR/runtime/reporting/ai-auditor-report-internal.sh"
 
 if [ "$EUID" -ne 0 ]; then
     echo "ERROR: This script must be run as root" >&2

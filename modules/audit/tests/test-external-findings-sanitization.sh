@@ -42,11 +42,11 @@ with open(sys.argv[1], "w", encoding="utf-8") as stream:
     json.dump(inventory, stream)
 PY
 
-/usr/bin/python3 "$MODULE_DIR/reporting/analyze-inventory.py" "$INVENTORY" --output "$FINDINGS"
-/usr/bin/python3 "$MODULE_DIR/reporting/sanitize-findings.py" "$FINDINGS" --output "$EXTERNAL"
-"$MODULE_DIR/reporting/prepare-external-report.sh" "$INVENTORY" > "$PIPELINED"
+/usr/bin/python3 "$MODULE_DIR/runtime/reporting/analyze-inventory.py" "$INVENTORY" --output "$FINDINGS"
+/usr/bin/python3 "$MODULE_DIR/runtime/reporting/sanitize-findings.py" "$FINDINGS" --output "$EXTERNAL"
+"$MODULE_DIR/runtime/reporting/prepare-external-report.sh" "$INVENTORY" > "$PIPELINED"
 
-/usr/bin/python3 - "$MODULE_DIR/reporting/schema/ai-auditor-external-findings-v1.schema.json" "$EXTERNAL" <<'PY'
+/usr/bin/python3 - "$MODULE_DIR/runtime/reporting/schema/ai-auditor-external-findings-v1.schema.json" "$EXTERNAL" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -115,7 +115,7 @@ with open(sys.argv[2], "w", encoding="utf-8") as stream:
     json.dump(report, stream)
 PY
 
-if /usr/bin/python3 "$MODULE_DIR/reporting/sanitize-findings.py" "$TAMPERED" >/dev/null 2>&1; then
+if /usr/bin/python3 "$MODULE_DIR/runtime/reporting/sanitize-findings.py" "$TAMPERED" >/dev/null 2>&1; then
     echo "sanitizer unexpectedly accepted modified public finding text" >&2
     exit 1
 fi
@@ -129,12 +129,12 @@ report["assessment"]["results"][0]["status"] = "passed"
 with open(sys.argv[2], "w", encoding="utf-8") as stream:
     json.dump(report, stream)
 PY
-if /usr/bin/python3 "$MODULE_DIR/reporting/sanitize-findings.py" "$TAMPERED" >/dev/null 2>&1; then
+if /usr/bin/python3 "$MODULE_DIR/runtime/reporting/sanitize-findings.py" "$TAMPERED" >/dev/null 2>&1; then
     echo "sanitizer unexpectedly accepted assessment/finding disagreement" >&2
     exit 1
 fi
 
-if "$MODULE_DIR/reporting/prepare-external-report.sh" >/dev/null 2>&1; then
+if "$MODULE_DIR/runtime/reporting/prepare-external-report.sh" >/dev/null 2>&1; then
     echo "external report wrapper unexpectedly accepted missing input" >&2
     exit 1
 fi

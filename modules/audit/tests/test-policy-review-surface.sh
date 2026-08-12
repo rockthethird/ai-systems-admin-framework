@@ -10,12 +10,12 @@ from pathlib import Path
 import yaml
 
 module = Path(sys.argv[1])
-rules = yaml.safe_load((module / "policy/rules.yaml").read_text())["rules"]
+rules = yaml.safe_load((module / "deploy/policy/rules.yaml").read_text())["rules"]
 runtime_paths = [
-    module / "reporting/analyze-inventory.py",
-    module / "reporting/sanitize-findings.py",
-    module / "reporting/sanitize-findings-internal.py",
-    module / "reporting/sanitize_common.py",
+    module / "runtime/reporting/analyze-inventory.py",
+    module / "runtime/reporting/sanitize-findings.py",
+    module / "runtime/reporting/sanitize-findings-internal.py",
+    module / "runtime/reporting/sanitize_common.py",
 ]
 runtime = "\n".join(path.read_text() for path in runtime_paths)
 for rule in rules:

@@ -28,7 +28,7 @@ and [`threat model`](modules/audit/docs/THREAT-MODEL.md) before changing behavio
 ## Adding a control
 
 Prefer an existing named evaluator. Add the control once to
-`modules/audit/policy/rules.yaml`, update fixtures, compile the manifest, and
+`modules/audit/deploy/policy/rules.yaml`, update fixtures, compile the manifest, and
 confirm both disclosure profiles. If a new primitive is unavoidable, keep it
 small, name it explicitly in schema, and test success, failure, unknown, and
 malformed-input behavior.
@@ -39,7 +39,7 @@ The review-surface test enforces this rule.
 ## Adding collection
 
 Define fixed command candidates or a named built-in in
-`modules/audit/policy/collectors.yaml`. Collection must retain hard ceilings for
+`modules/audit/deploy/policy/collectors.yaml`. Collection must retain hard ceilings for
 time, CPU, file descriptors, bytes, and items. Review the information disclosed
 by the new evidence and update both report-profile tests.
 
@@ -52,8 +52,8 @@ caller-controlled argument to sudoers.
 From the repository root:
 
 ```bash
-python3 modules/audit/build/compile-policy.py
-python3 modules/audit/build/compile-policy.py --check
+python3 modules/audit/deploy/scripts/policy.py
+python3 modules/audit/deploy/scripts/policy.py --check
 
 for test in modules/audit/tests/test-*.sh; do
     bash "$test"

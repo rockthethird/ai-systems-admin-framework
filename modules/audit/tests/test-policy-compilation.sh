@@ -3,13 +3,13 @@ set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly MODULE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-readonly COMPILER="$MODULE_DIR/build/compile-policy.py"
+readonly COMPILER="$MODULE_DIR/deploy/scripts/policy.py"
 readonly TEMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 python3 "$COMPILER" --check
 python3 "$COMPILER" --output "$TEMP_DIR/manifest.json"
-cmp "$MODULE_DIR/generated/policy-manifest.json" "$TEMP_DIR/manifest.json"
+cmp "$MODULE_DIR/deploy/generated/policy-manifest.json" "$TEMP_DIR/manifest.json"
 
 python3 - "$TEMP_DIR/manifest.json" <<'PY'
 import json
@@ -25,7 +25,7 @@ assert ids == {
 print("collector policy coverage passed")
 PY
 
-cp -a "$MODULE_DIR/policy" "$TEMP_DIR/policy"
+cp -a "$MODULE_DIR/deploy/policy" "$TEMP_DIR/policy"
 python3 - "$TEMP_DIR/policy/profiles.yaml" <<'PY'
 import sys
 from pathlib import Path
@@ -37,7 +37,7 @@ if python3 "$COMPILER" --policy-dir "$TEMP_DIR/policy" --output "$TEMP_DIR/unsaf
     exit 1
 fi
 
-cp -a "$MODULE_DIR/policy" "$TEMP_DIR/duplicate"
+cp -a "$MODULE_DIR/deploy/policy" "$TEMP_DIR/duplicate"
 python3 - "$TEMP_DIR/duplicate/rules.yaml" <<'PY'
 import sys
 from pathlib import Path

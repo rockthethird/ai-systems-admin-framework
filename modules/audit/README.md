@@ -29,7 +29,7 @@ The fixed child-command review and current trace limitations are recorded in [CO
 
 ```bash
 # On the controller
-bash modules/audit/build/10-generate-sudoers-from-yaml.sh
+bash modules/audit/deploy/scripts/generate-sudoers.sh
 bash modules/audit/tests/test-inventory-collector.sh
 bash modules/audit/tests/test-sudoers-generation.sh
 bash modules/audit/tests/test-findings-schema.sh
@@ -40,9 +40,9 @@ bash modules/audit/tests/test-policy-compilation.sh
 bash modules/audit/tests/test-policy-review-surface.sh
 
 # On a disposable target, from the repository root
-sudo bash modules/audit/deploy/12-create-report-identities.sh
-sudo bash modules/audit/deploy/15-deploy-inventory-collector.sh
-sudo bash modules/audit/deploy/30-configure-sudoers.sh
+sudo bash modules/audit/deploy/scripts/create-report-identities.sh
+sudo bash modules/audit/deploy/scripts/install-report-runtime.sh
+sudo bash modules/audit/deploy/scripts/install-sudoers.sh
 
 # Positive and negative authorization checks
 sudo -u ai-auditor-cloud sudo -n /usr/local/libexec/ai-auditor-report

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly COLLECTOR="$SCRIPT_DIR/../collect/ai-auditor-inventory.py"
+readonly COLLECTOR="$SCRIPT_DIR/../runtime/collect/ai-auditor-inventory.py"
 readonly OUTPUT="$(mktemp)"
 trap 'rm -f "$OUTPUT"' EXIT
 

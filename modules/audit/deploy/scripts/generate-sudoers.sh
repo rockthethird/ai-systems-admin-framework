@@ -7,7 +7,7 @@
 #          on the CONTROLLER before deployment to server
 #
 # Location: CONTROLLER (admin machine)
-# Usage: bash ./10-generate-sudoers-from-yaml.sh [-o|--output FILE] [-h|--help]
+# Usage: bash ./generate-sudoers.sh [-o|--output FILE] [-h|--help]
 #
 # Workflow:
 #   1. Parse enabled-commands.yaml
@@ -36,8 +36,8 @@ set -euo pipefail
 # Script Setup
 ################################################################################
 
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../" && pwd)"
-readonly BUILD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly DEPLOY_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Source common library
 if [ ! -f "$SCRIPT_DIR/lib/common.sh" ]; then
@@ -83,7 +83,7 @@ if [ "$HELP_REQUESTED" = "true" ]; then
 Generate Sudoers from YAML Configuration
 
 SYNOPSIS
-    bash ./10-generate-sudoers-from-yaml.sh [-o|--output FILE] [-v|--verbose] [-h|--help]
+    bash ./generate-sudoers.sh [-o|--output FILE] [-v|--verbose] [-h|--help]
 
 OPTIONS
     -o, --output FILE  Write generated sudoers to FILE (default: stdout)
@@ -92,7 +92,7 @@ OPTIONS
 
 DESCRIPTION
     Controller-side generation and validation of sudoers file. This script:
-    1. Parses ../configure/enabled-commands.yaml
+    1. Parses ../policy/enabled-commands.yaml
     2. Generates sudoers file with full audit trail
     3. Validates syntax using visudo
     4. Displays output for admin review
@@ -101,24 +101,24 @@ DESCRIPTION
     Admin is responsible for reviewing the generated sudoers carefully.
 
 WORKFLOW
-    1. Edit ../configure/enabled-commands.yaml with desired commands
+    1. Edit ../policy/enabled-commands.yaml with desired commands
     2. Run this generation script
     3. Review the generated sudoers carefully (especially commands!)
-    4. If correct, copy to server and run ../deploy/30-configure-sudoers.sh
+    4. If correct, copy to server and run install-sudoers.sh
     5. On server, manually test commands to verify they work as expected
 
 EXAMPLES
     # Display generated sudoers to stdout
-    bash ./10-generate-sudoers-from-yaml.sh
+    bash ./generate-sudoers.sh
 
     # Save to file for review
-    bash ./10-generate-sudoers-from-yaml.sh --output /tmp/sudoers-new
+    bash ./generate-sudoers.sh --output /tmp/sudoers-new
 
     # Verbose output for debugging
-    bash ./10-generate-sudoers-from-yaml.sh --verbose
+    bash ./generate-sudoers.sh --verbose
 
 PREREQUISITES
-    - ../configure/enabled-commands.yaml must exist (YAML configuration)
+    - ../policy/enabled-commands.yaml must exist (YAML configuration)
     - Local sudoers template (sudoers-ai-auditor-template in this directory)
     - Recommended: visudo available for syntax validation
     - Bash 4.3+ (for nameref support)
@@ -131,7 +131,7 @@ OUTPUT
 NEXT STEPS (on success)
     1. REVIEW the generated sudoers carefully
     2. Copy content to server via secure channel (SSH, etc.)
-    3. On SERVER: sudo bash deploy/30-configure-sudoers.sh
+    3. On SERVER: sudo bash deploy/scripts/install-sudoers.sh
     4. On SERVER: Manually test each command to verify functionality
 
 SECURITY NOTE
@@ -147,8 +147,8 @@ fi
 # Load Configuration Files
 ################################################################################
 
-readonly YAML_CONFIG="$SCRIPT_DIR/modules/audit/configure/enabled-commands.yaml"
-readonly SUDOERS_GENERATED="$BUILD_DIR/sudoers-ai-auditor-generated"
+readonly YAML_CONFIG="$DEPLOY_DIR/policy/enabled-commands.yaml"
+readonly SUDOERS_GENERATED="$DEPLOY_DIR/generated/sudoers-ai-auditor"
 
 require_file "$YAML_CONFIG" "YAML command configuration" || exit 1
 
@@ -241,12 +241,12 @@ else
     # No output file: backup and update generated
     if [ -f "$SUDOERS_GENERATED" ]; then
         cp "$SUDOERS_GENERATED" "$SUDOERS_GENERATED.backup.$(date +%Y%m%d-%H%M%S)"
-        log_info "Backed up previous version: sudoers-ai-auditor-generated.backup.*"
+        log_info "Backed up previous version: sudoers-ai-auditor.backup.*"
     fi
     
     cp "$TEMP_SUDOERS" "$SUDOERS_GENERATED"
     log_success "Sudoers generated: $SUDOERS_GENERATED"
-    log_info "Ready for deployment via: deploy/30-configure-sudoers.sh"
+    log_info "Ready for deployment via: deploy/scripts/install-sudoers.sh"
     echo ""
     log_info "Preview (first 20 lines):"
     head -20 "$SUDOERS_GENERATED" | sed 's/^/  /'
@@ -268,7 +268,7 @@ if [ -n "$OUTPUT_FILE" ]; then
     log_info "Next steps:"
     log_info "  1. CAREFULLY review the sudoers file"
     log_info "  2. Transfer to server: scp $OUTPUT_FILE user@server:/tmp/"
-    log_info "  3. On SERVER: sudo bash deploy/30-configure-sudoers.sh -f /tmp/$(basename $OUTPUT_FILE)"
+    log_info "  3. On SERVER: sudo bash deploy/scripts/install-sudoers.sh -f /tmp/$(basename $OUTPUT_FILE)"
     log_info "  4. On SERVER: Manually test each command"
 else
     log_info "Sudoers generated and ready to deploy"
@@ -276,8 +276,8 @@ else
     log_info "  1. CAREFULLY review the generated sudoers above"
     log_info "  2. Verify all commands and arguments are correct"
     log_info "  3. Check for any unintended or dangerous commands"
-    log_info "  4. On SERVER: sudo bash deploy/30-configure-sudoers.sh"
-    log_info "     (Automatically uses: sudoers-ai-auditor-generated)"
+    log_info "  4. On SERVER: sudo bash deploy/scripts/install-sudoers.sh"
+    log_info "     (Automatically uses: sudoers-ai-auditor)"
     log_info "  5. On SERVER: Manually test each command"
 fi
 

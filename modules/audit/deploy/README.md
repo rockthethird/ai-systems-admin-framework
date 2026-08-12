@@ -4,24 +4,35 @@ Run deployment against a snapshot-backed or disposable Linux target. The scripts
 
 ## Sequence
 
+Review the four YAML files under `policy/` before generating artifacts.
+Generated files under `generated/` are derived deployment inputs and must not
+be edited by hand.
+
 ```bash
 # Target: create locked cloud and local report identities (no SSH keys)
-sudo bash modules/audit/deploy/12-create-report-identities.sh
+sudo bash modules/audit/deploy/scripts/create-report-identities.sh
 
 # Target: install root-only audit helpers and the sanitized endpoint
-sudo bash modules/audit/deploy/15-deploy-inventory-collector.sh
+sudo bash modules/audit/deploy/scripts/install-report-runtime.sh
 
 # Controller: regenerate and review sudoers
-python3 modules/audit/build/compile-policy.py --check
-bash modules/audit/build/10-generate-sudoers-from-yaml.sh
+python3 modules/audit/deploy/scripts/policy.py --check
+bash modules/audit/deploy/scripts/generate-sudoers.sh
 
 # Target: validate a root-owned candidate and activate it atomically
-sudo bash modules/audit/deploy/30-configure-sudoers.sh
+sudo bash modules/audit/deploy/scripts/install-sudoers.sh
 ```
 
 Stop here before configuring SSH. The existing key and SSH-hardening scripts target the legacy `ai-auditor` identity and must not be applied to the two report identities until profile-specific key and forced-command binding is designed.
 
 The sudoers deployment requires `visudo`; skipping validation is not an acceptable production path.
+
+## Transitional sudoers generation
+
+`policy/enabled-commands.yaml` temporarily duplicates the two identity-bound
+endpoints for the existing sudoers generator. Do not add host commands or new
+capabilities there. This compatibility input will be removed when `policy.py`
+renders sudoers directly from `policy/identities.yaml`.
 
 ## Verify
 

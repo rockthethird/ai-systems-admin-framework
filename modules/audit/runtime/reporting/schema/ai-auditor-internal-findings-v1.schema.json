@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/rockthethird/ai-systems-admin-framework/blob/master/modules/audit/reporting/schema/ai-auditor-internal-findings-v1.schema.json",
+  "$id": "https://github.com/rockthethird/ai-systems-admin-framework/blob/master/modules/audit/runtime/reporting/schema/ai-auditor-internal-findings-v1.schema.json",
   "title": "AI Auditor Internal Findings v1",
   "type": "object",
   "additionalProperties": false,
