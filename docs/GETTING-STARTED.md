@@ -79,7 +79,10 @@ cat docs/04-RISK-ASSESSMENT.md
 cat templates/sudoers-ai-auditor
 
 # Read the command justifications
-cat templates/ai-auditor-commands.md
+cat modules/audit/policy/collectors.yaml
+cat modules/audit/policy/rules.yaml
+cat modules/audit/policy/profiles.yaml
+cat modules/audit/policy/identities.yaml
 ```
 
 ---

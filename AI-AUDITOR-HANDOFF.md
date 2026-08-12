@@ -18,9 +18,7 @@ The AI is not trusted as a system administrator. It may analyze broad evidence, 
 - `modules/audit/deploy/15-deploy-inventory-collector.sh`
   - Validates Python and shell syntax without writing to the source checkout.
   - Installs the collector, analyzer, and sanitizer as root-only helpers and activates the public report endpoint last.
-- `modules/audit/configure/enabled-commands.yaml` and `lib/sudoers.sh`
-  - Generate one `root:root` sanitized report rule; the raw collector is absent.
-  - Emit sudoers `""` so the rule matches no-argument execution only.
+- The transitional sudoers generator still reads `modules/audit/configure/enabled-commands.yaml` through `lib/sudoers.sh`. It may contain only the two fixed report endpoints and will be removed when generation consumes the validated identity policy.
 - `modules/audit/deploy/30-configure-sudoers.sh`
   - Resolves its artifact path independently of the caller's working directory.
   - Requires `visudo`, installs a root-owned temporary candidate, validates it before activation, and verifies content, ownership, mode, and syntax.
@@ -54,7 +52,7 @@ The original raw collector boundary passed end-to-end deployment inside a dispos
 - absence of the VM hostname and raw evidence from the returned document,
 - direct and sudo denial of the raw collector,
 - rejection of report arguments and denial of an attempted `/bin/sh`,
-- and an exact report-only rule shown by `sudo -l -U ai-auditor`.
+- and exact identity-bound report rules shown by `sudo -l -U ai-auditor-cloud` and `sudo -l -U ai-auditor-local`.
 
 The expanded nine-rule endpoint was deployed on 2026-08-11. Both profiles reported six passed and three failed controls with no unknowns. The live failures were password-capable SSH authentication, direct root SSH login, and interactive shells for the two report identities. Endpoint ownership and auditor path permissions passed. External-safe leakage checks and cross-profile/raw-collector denial checks also passed.
 

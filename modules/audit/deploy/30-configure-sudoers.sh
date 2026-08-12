@@ -81,7 +81,7 @@ DESCRIPTION
     Deploys sudoers configuration for ai-auditor with:
     - Environment: env_reset with explicit safe variables
     - Security: SSH-only (!requiretty), no password (NOPASSWD), secure_path
-    - Logging: All commands logged to /var/log/sudo-ai-auditor.log
+    - Logging: Commands logged to identity-specific sudo logfiles
 
     By default uses:
     - Generated sudoers: build/sudoers-ai-auditor-generated (from build script)
@@ -94,7 +94,7 @@ WORKFLOW
     1. Generate artifact: bash ../build/10-generate-sudoers-from-yaml.sh
     2. Deploy generated: sudo bash ./30-configure-sudoers.sh
     3. Or deploy custom: sudo bash ./30-configure-sudoers.sh -f /custom/sudoers
-    4. Verify: sudo -l -U ai-auditor
+    4. Verify: sudo -l -U ai-auditor-cloud and sudo -l -U ai-auditor-local
 
 EOF
 }

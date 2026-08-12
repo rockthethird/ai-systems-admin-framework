@@ -12,6 +12,7 @@ sudo bash modules/audit/deploy/12-create-report-identities.sh
 sudo bash modules/audit/deploy/15-deploy-inventory-collector.sh
 
 # Controller: regenerate and review sudoers
+python3 modules/audit/build/compile-policy.py --check
 bash modules/audit/build/10-generate-sudoers-from-yaml.sh
 
 # Target: validate a root-owned candidate and activate it atomically
@@ -37,12 +38,16 @@ sudo -u ai-auditor-local sudo -n /bin/sh -c id
 
 sudo visudo -c -f /etc/sudoers.d/ai-auditor
 sudo stat -c '%U:%G %a %n' /usr/local/libexec/ai-auditor-{inventory,analyze-inventory,sanitize-findings,report} /etc/sudoers.d/ai-auditor
-sudo -l -U ai-auditor
+sudo -l -U ai-auditor-cloud
+sudo -l -U ai-auditor-local
 ```
 
 Expected modes are `0700` for the raw collector, analyzer, and sanitizers; `0755` for both report endpoints; and `0440` for sudoers. Each identity sees only its assigned endpoint in `sudo -l`. SSH key binding is a separate, intentionally deferred step.
 
-Inspect `/var/log/sudo-ai-auditor.log` if the platform's sudo build honors the configured logfile. Centralized or tamper-resistant log export is not currently provided.
+Inspect `/var/log/sudo-ai-auditor-cloud.log` and
+`/var/log/sudo-ai-auditor-local.log` if the platform's sudo build honors the
+configured logfiles. Centralized or tamper-resistant log export is not
+currently provided.
 
 ## Rollback
 
