@@ -2,13 +2,30 @@
 set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly MODULE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+readonly SOURCE_MODULE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+readonly TEMP_DIR="$(mktemp -d)"
+readonly REPO_ROOT="$TEMP_DIR/repo"
+readonly MODULE_DIR="$REPO_ROOT/modules/audit"
 readonly DEPLOY="$MODULE_DIR/deploy/scripts/deploy.sh"
 readonly POLICY="$MODULE_DIR/deploy/scripts/policy.py"
 readonly DIRTY_MARKER="$MODULE_DIR/.deployment-preflight-dirty-test"
 readonly UNRELATED_ARTIFACT="$MODULE_DIR/deploy/artifacts/unrelated-test-link"
-readonly TEMP_DIR="$(mktemp -d)"
-trap 'rm -f "$DIRTY_MARKER" "$UNRELATED_ARTIFACT"; rm -rf "$TEMP_DIR"' EXIT
+readonly SOURCE_APPROVAL="$SOURCE_MODULE_DIR/deploy/.state/policy-approval.json"
+trap 'rm -rf "$TEMP_DIR"' EXIT
+
+source_approval_sha256=""
+if [ -e "$SOURCE_APPROVAL" ]; then
+    source_approval_sha256="$(sha256sum "$SOURCE_APPROVAL" | cut -d' ' -f1)"
+fi
+
+mkdir -p "$REPO_ROOT/modules"
+cp -a "$SOURCE_MODULE_DIR" "$MODULE_DIR"
+rm -rf "$MODULE_DIR/deploy/.state"
+git -C "$REPO_ROOT" init -q
+git -C "$REPO_ROOT" config user.name "AI Auditor Test"
+git -C "$REPO_ROOT" config user.email "ai-auditor-test@invalid"
+git -C "$REPO_ROOT" add modules/audit
+git -C "$REPO_ROOT" commit -qm "test fixture"
 
 "$DEPLOY" --help >/dev/null
 if "$DEPLOY" --unknown >/dev/null 2>&1; then
@@ -61,12 +78,14 @@ if sudo -n "$DEPLOY" --allow-dirty --non-interactive \
     exit 1
 fi
 
-mkdir -p "$TEMP_DIR/modules"
-cp -a "$MODULE_DIR" "$TEMP_DIR/modules/audit"
-readonly UNVERSIONED_POLICY="$TEMP_DIR/modules/audit/deploy/scripts/policy.py"
-readonly UNVERSIONED_DEPLOY="$TEMP_DIR/modules/audit/deploy/scripts/deploy.sh"
+readonly UNVERSIONED_MODULE="$TEMP_DIR/unversioned/modules/audit"
+mkdir -p "$(dirname "$UNVERSIONED_MODULE")"
+cp -a "$SOURCE_MODULE_DIR" "$UNVERSIONED_MODULE"
+rm -rf "$UNVERSIONED_MODULE/deploy/.state"
+readonly UNVERSIONED_POLICY="$UNVERSIONED_MODULE/deploy/scripts/policy.py"
+readonly UNVERSIONED_DEPLOY="$UNVERSIONED_MODULE/deploy/scripts/deploy.sh"
 python3 "$UNVERSIONED_POLICY" build >/dev/null
-unversioned_digest="$(sha256sum "$TEMP_DIR/modules/audit/deploy/artifacts/artifact-index.json" | cut -d' ' -f1)"
+unversioned_digest="$(sha256sum "$UNVERSIONED_MODULE/deploy/artifacts/artifact-index.json" | cut -d' ' -f1)"
 printf '%s\n' "$unversioned_digest" | script -qfec \
     "python3 '$UNVERSIONED_POLICY' review" /dev/null >/dev/null
 if sudo -n "$UNVERSIONED_DEPLOY" --check >/dev/null 2>&1; then
@@ -74,5 +93,12 @@ if sudo -n "$UNVERSIONED_DEPLOY" --check >/dev/null 2>&1; then
     exit 1
 fi
 sudo -n "$UNVERSIONED_DEPLOY" --check --allow-unversioned >/dev/null
+
+if [ -n "$source_approval_sha256" ]; then
+    test -f "$SOURCE_APPROVAL"
+    test "$(sha256sum "$SOURCE_APPROVAL" | cut -d' ' -f1)" = "$source_approval_sha256"
+else
+    test ! -e "$SOURCE_APPROVAL"
+fi
 
 echo "deployment preflight tests passed"
