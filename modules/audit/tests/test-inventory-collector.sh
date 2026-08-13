@@ -15,6 +15,10 @@ fi
 
 python3 "$POLICY" build >/dev/null
 python3 "$COLLECTOR" > "$OUTPUT"
+if find "$APP" -name '__pycache__' -o -name '*.pyc' | grep -q .; then
+    echo "collector execution modified the approved runtime tree with Python bytecode" >&2
+    exit 1
+fi
 python3 - "$OUTPUT" <<'PY'
 import json
 import sys

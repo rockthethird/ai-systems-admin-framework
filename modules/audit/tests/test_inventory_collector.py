@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Failure-mode tests for the privileged inventory command runner."""
 
+import copy
 import importlib.util
 import json
 import sys
@@ -9,6 +10,9 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 COLLECTOR = Path(sys.argv[1])
+sys.path.insert(0, str(COLLECTOR.parent))
+import collector_policy
+
 spec = importlib.util.spec_from_file_location("ai_auditor_inventory", COLLECTOR)
 assert spec and spec.loader
 module = importlib.util.module_from_spec(spec)
@@ -20,6 +24,16 @@ def executable(directory: str, name: str, body: str) -> str:
     path.write_text(f"#!/bin/sh\n{body}\n", encoding="utf-8")
     path.chmod(0o755)
     return str(path)
+
+
+def rejected(policy: dict, mutate) -> None:
+    candidate = copy.deepcopy(policy)
+    mutate(candidate)
+    try:
+        collector_policy.validate_collector_policy(candidate)
+    except ValueError:
+        return
+    raise AssertionError("collector policy validator accepted an invalid policy")
 
 
 def main() -> None:
@@ -61,6 +75,21 @@ def main() -> None:
         manifest = Path(directory) / "manifest.json"
         installed = COLLECTOR.parent.parent / "policy" / "manifest.json"
         policy = json.loads(installed.read_text())
+        collector_contract = policy["collectors"]
+        collector_policy.validate_collector_policy(collector_contract)
+        assert set(module.PRIMITIVES) == set(collector_policy.PRIMITIVE_PARAMETERS)
+        rejected(collector_contract,
+                 lambda value: value["defaults"].__setitem__("max_items", True))
+        rejected(collector_contract,
+                 lambda value: value["collectors"][0]["candidates"][0]
+                 .__setitem__("path", "relative-command"))
+        rejected(collector_contract,
+                 lambda value: value["collectors"][-1]["parameters"]["paths"]
+                 .__setitem__(0, "../escape"))
+        rejected(collector_contract,
+                 lambda value: value["collectors"][-1]["parameters"]
+                 .__setitem__("unexpected", []))
+
         policy["collectors"]["collectors"].append(
             dict(policy["collectors"]["collectors"][0]))
         manifest.write_text(json.dumps(policy))
@@ -70,6 +99,16 @@ def main() -> None:
             assert "unique" in str(exc)
         else:
             raise AssertionError("collector accepted duplicate manifest IDs")
+
+        policy = json.loads(installed.read_text())
+        policy["collectors"]["collectors"][-1]["parameters"]["paths"][0] = "../escape"
+        manifest.write_text(json.dumps(policy))
+        try:
+            module.load_collectors(manifest)
+        except ValueError as exc:
+            assert "absolute" in str(exc)
+        else:
+            raise AssertionError("collector accepted an unsafe built-in path")
 
     print("inventory collector boundary tests passed")
 

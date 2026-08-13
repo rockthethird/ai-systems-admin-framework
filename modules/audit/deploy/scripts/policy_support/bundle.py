@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import types
 from pathlib import Path
 from typing import Any
 
@@ -27,16 +28,6 @@ EXTERNAL_REQUIRED_EXCLUSIONS = {
     "raw-inventory", "host-identity", "collection-timestamps",
     "evidence-paths", "evidence-values", "raw-errors",
 }
-BUILTIN_PARAMETERS = {
-    "passwd-entries": set(),
-    "host-platform": set(),
-    "os-release": set(),
-    "ssh-effective-settings": {"users", "settings", "executable_paths"},
-    "account-path-metadata": {"users", "relative_paths"},
-    "path-metadata": {"paths"},
-}
-
-
 def fail(message: str) -> None:
     raise ValueError(message)
 
@@ -85,7 +76,21 @@ def load_policy(policy_dir: Path) -> tuple[dict[str, Any], str]:
     return documents, sha256(canonical_json(policy_source))
 
 
-def validate_policy(documents: dict[str, Any]) -> None:
+def load_source_module(module_dir: Path, relative: str, name: str) -> types.ModuleType:
+    """Execute one explicit, regular repository source file as a private module."""
+    source = module_dir.joinpath(*Path(relative).parts)
+    content = source_bytes(module_dir, relative)
+    module = types.ModuleType(name)
+    module.__file__ = str(source)
+    exec(compile(content, str(source), "exec"), module.__dict__)
+    return module
+
+
+def validate_policy(documents: dict[str, Any], module_dir: Path) -> None:
+    collector_policy = load_source_module(
+        module_dir, "runtime/collect/collector_policy.py", "_ai_auditor_collector_policy")
+    collector_policy.validate_collector_policy(documents["collectors"])
+
     collectors = documents["collectors"]["collectors"]
     rules = documents["rules"]["rules"]
     profiles = documents["profiles"]["profiles"]
@@ -104,28 +109,6 @@ def validate_policy(documents: dict[str, Any]) -> None:
         deployment["directories"], "destination", "deployment directory")
     if file_destinations & directory_destinations:
         fail("deployment destination cannot be both a file and directory")
-
-    for collector in collectors:
-        if collector["type"] == "command":
-            for command in collector["candidates"]:
-                if not command["path"].startswith("/"):
-                    fail(f"collector {collector['id']} command is not absolute")
-                if any("\x00" in argument for argument in command["args"]):
-                    fail(f"collector {collector['id']} contains a NUL argument")
-        else:
-            expected = BUILTIN_PARAMETERS[collector["primitive"]]
-            actual = set(collector.get("parameters", {}))
-            if actual != expected:
-                fail(f"collector {collector['id']} parameters do not match {collector['primitive']}")
-            for value in collector.get("parameters", {}).get("paths", []):
-                if not value.startswith("/"):
-                    fail(f"collector {collector['id']} path is not absolute")
-            for value in collector.get("parameters", {}).get("executable_paths", []):
-                if not value.startswith("/"):
-                    fail(f"collector {collector['id']} executable path is not absolute")
-            for value in collector.get("parameters", {}).get("relative_paths", []):
-                if Path(value).is_absolute() or ".." in Path(value).parts:
-                    fail(f"collector {collector['id']} relative path escapes its account home")
 
     generated = [item["generated"] for item in deployment["files"] if "generated" in item]
     if sorted(generated) != ["policy-manifest", "sudoers"]:
@@ -280,7 +263,7 @@ def build_index(policy_sha256: str, entries: list[dict[str, str]]) -> bytes:
 def render_bundle(policy_dir: Path, module_dir: Path, validation_dir: Path
                   ) -> tuple[list[dict[str, str]], dict[str, bytes], bytes, str]:
     documents, policy_digest = load_policy(policy_dir)
-    validate_policy(documents)
+    validate_policy(documents, module_dir)
     entries, contents = resolve_bundle(documents, module_dir)
     validate_runtime(entries, contents, validation_dir)
     sudoers_entry = next(item for item in entries if item.get("id") == "sudoers")

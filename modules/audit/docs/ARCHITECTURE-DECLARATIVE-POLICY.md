@@ -45,6 +45,14 @@ Each file has a strict JSON Schema with `additionalProperties: false`.
 Cross-file constraints that JSON Schema cannot express are enforced by the
 compiler.
 
+Collector semantics have one standard-library-only validator at
+`runtime/collect/collector_policy.py`. The compiler executes that exact,
+non-symlinked repository source through a constrained loader; deployment copies
+the same bytes beside the collector. Both build-time and runtime validation
+therefore enforce one primitive registry, parameter contract, command boundary,
+and set of resource bounds. JSON Schema remains the structural review aid and
+does not duplicate the supported primitive registry.
+
 ## Compilation and deployment
 
 The compiler validates YAML, resolves references, enforces security invariants,
@@ -95,7 +103,7 @@ can follow the boundary from data to code.
 - Shell evaluation or command strings
 - Inline regular expressions
 - Templates or interpolation
-- Dynamic imports or function names outside fixed registries
+- Policy-selected imports or function names outside fixed registries
 - Arbitrary expressions or embedded programming languages
 - Profile-selected privilege escalation
 - Raw evidence disclosure to an external profile

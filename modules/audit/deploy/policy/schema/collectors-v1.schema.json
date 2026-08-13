@@ -29,7 +29,7 @@
         "parser": {"enum": ["lines"]},
         "max_items": {"type": "integer", "minimum": 1, "maximum": 10000},
         "optional": {"type": "boolean"},
-        "primitive": {"enum": ["passwd-entries", "host-platform", "os-release", "ssh-effective-settings", "account-path-metadata", "path-metadata"]},
+        "primitive": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
         "parameters": {"type": "object"}
       },
       "allOf": [

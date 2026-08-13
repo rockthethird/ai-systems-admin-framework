@@ -26,13 +26,14 @@ build "$MODULE_DIR/deploy/policy" "$TEMP_DIR/second"
 diff -r "$TEMP_DIR/first/rootfs" "$TEMP_DIR/second/rootfs"
 cmp "$TEMP_DIR/first/artifact-index.json" "$TEMP_DIR/second/artifact-index.json"
 
-python3 - "$TEMP_DIR/first" <<'PY'
+python3 - "$TEMP_DIR/first" "$MODULE_DIR" <<'PY'
 import hashlib
 import json
 import sys
 from pathlib import Path
 
 artifacts = Path(sys.argv[1])
+module = Path(sys.argv[2])
 index_bytes = (artifacts / "artifact-index.json").read_bytes()
 index = json.loads(index_bytes)
 manifest = json.loads((artifacts / "rootfs/opt/ai-auditor/policy/manifest.json").read_bytes())
@@ -58,6 +59,10 @@ for item in index["entries"]:
         assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
 files = {item["id"]: item for item in index["entries"] if item["kind"] == "file"}
 assert files["report-external"]["sha256"] == files["report-internal"]["sha256"]
+collector_policy = artifacts / "rootfs/opt/ai-auditor/lib/collector_policy.py"
+assert collector_policy.read_bytes() == (module / "runtime/collect/collector_policy.py").read_bytes()
+assert files["collector-policy"]["sha256"] == hashlib.sha256(
+    collector_policy.read_bytes()).hexdigest()
 print("deterministic policy bundle passed")
 PY
 
@@ -70,6 +75,18 @@ path.write_text(path.read_text().replace("      - raw-inventory\n", "", 1))
 PY
 if build "$TEMP_DIR/unsafe" "$TEMP_DIR/unsafe-artifacts" 2>/dev/null; then
     echo "compiler accepted weakened external disclosure" >&2
+    exit 1
+fi
+
+cp -a "$MODULE_DIR/deploy/policy" "$TEMP_DIR/unsafe-collector"
+python3 - "$TEMP_DIR/unsafe-collector/collectors.yaml" <<'PY'
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+path.write_text(path.read_text().replace("        - /etc/crontab", "        - ../etc/crontab", 1))
+PY
+if build "$TEMP_DIR/unsafe-collector" "$TEMP_DIR/unsafe-collector-artifacts" 2>/dev/null; then
+    echo "compiler accepted an unsafe built-in collector path" >&2
     exit 1
 fi
 

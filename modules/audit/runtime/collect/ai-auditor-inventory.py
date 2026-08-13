@@ -17,6 +17,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+sys.dont_write_bytecode = True
+
+from collector_policy import PRIMITIVE_PARAMETERS, validate_collector_policy
+
 SCHEMA_VERSION = "1.0"
 MANIFEST_VERSION = "ai-auditor-policy-manifest/v1"
 MANIFEST_PATH = Path(__file__).resolve().parent.parent / "policy" / "manifest.json"
@@ -27,20 +31,6 @@ MAX_CPU_SECONDS = 5
 MAX_OPEN_FILES = 256
 MAX_FILE_BYTES = 1024 * 1024
 SAFE_ENV = {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C", "LC_ALL": "C"}
-LIMIT_FIELDS = {
-    "command_timeout_seconds", "max_items", "max_stream_bytes",
-    "max_cpu_seconds", "max_open_files", "max_file_bytes",
-}
-LIMIT_BOUNDS = {
-    "command_timeout_seconds": (1, 60),
-    "max_items": (1, 10000),
-    "max_stream_bytes": (1024, 4194304),
-    "max_cpu_seconds": (1, 30),
-    "max_open_files": (16, 1024),
-    "max_file_bytes": (1024, 4194304),
-}
-
-
 def unavailable(error: str = "command not found") -> dict[str, Any]:
     return {"available": False, "items": [], "truncated": False, "exit_code": None, "error": error}
 
@@ -216,6 +206,8 @@ PRIMITIVES = {
     "ssh-effective-settings": collect_ssh_settings,
     "account-path-metadata": collect_account_paths,
 }
+if set(PRIMITIVES) != set(PRIMITIVE_PARAMETERS):
+    raise RuntimeError("collector primitive implementations do not match policy contract")
 
 
 def load_collectors(manifest_path: Path) -> tuple[dict[str, int], list[dict[str, Any]]]:
@@ -223,45 +215,8 @@ def load_collectors(manifest_path: Path) -> tuple[dict[str, int], list[dict[str,
     if not isinstance(manifest, dict) or manifest.get("version") != MANIFEST_VERSION:
         raise ValueError("unsupported audit policy manifest")
     policy = manifest.get("collectors")
-    if not isinstance(policy, dict) or set(policy) != {"version", "defaults", "collectors"}:
-        raise ValueError("collector policy is invalid")
-    defaults = policy["defaults"]
-    collectors = policy["collectors"]
-    if (not isinstance(defaults, dict) or set(defaults) != LIMIT_FIELDS
-            or any(not isinstance(defaults[name], int) or isinstance(defaults[name], bool)
-                   or not minimum <= defaults[name] <= maximum
-                   for name, (minimum, maximum) in LIMIT_BOUNDS.items())):
-        raise ValueError("collector limits are invalid")
-    if not isinstance(collectors, list) or not collectors:
-        raise ValueError("collector catalog is invalid")
-    seen = set()
-    for collector in collectors:
-        if not isinstance(collector, dict) or not isinstance(collector.get("id"), str):
-            raise ValueError("collector entry is invalid")
-        if collector["id"] in seen:
-            raise ValueError("collector IDs must be unique")
-        seen.add(collector["id"])
-        if collector.get("type") == "command":
-            if collector.get("parser") != "lines" or not isinstance(collector.get("candidates"), list):
-                raise ValueError(f"command collector {collector['id']} is invalid")
-            max_items = collector.get("max_items", defaults["max_items"])
-            if not isinstance(max_items, int) or isinstance(max_items, bool) or not 1 <= max_items <= 10000:
-                raise ValueError(f"command collector {collector['id']} has an invalid item limit")
-            for candidate in collector["candidates"]:
-                path, arguments = candidate.get("path"), candidate.get("args")
-                if (not isinstance(path, str) or not os.path.isabs(path)
-                        or not isinstance(arguments, list) or len(arguments) > 20
-                        or any(not isinstance(arg, str) or "\x00" in arg or len(arg) > 1000
-                               for arg in arguments)):
-                    raise ValueError(f"command collector {collector['id']} is unsafe")
-        elif collector.get("type") == "builtin":
-            if collector.get("primitive") not in PRIMITIVES:
-                raise ValueError(f"collector {collector['id']} uses an unknown primitive")
-            if not isinstance(collector.get("parameters", {}), dict):
-                raise ValueError(f"collector {collector['id']} parameters are invalid")
-        else:
-            raise ValueError(f"collector {collector['id']} has an unknown type")
-    return defaults, collectors
+    validate_collector_policy(policy)
+    return policy["defaults"], policy["collectors"]
 
 
 def configure_limits(defaults: dict[str, int]) -> None:

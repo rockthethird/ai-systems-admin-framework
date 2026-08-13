@@ -37,6 +37,12 @@ files:
     owner: root
     group: root
     mode: "0700"
+  - id: collector-policy
+    source: runtime/collect/collector_policy.py
+    destination: /opt/ai-auditor/lib/collector_policy.py
+    owner: root
+    group: root
+    mode: "0600"
   - id: analyze
     source: runtime/reporting/analyze-inventory.py
     destination: /opt/ai-auditor/lib/analyze.py
