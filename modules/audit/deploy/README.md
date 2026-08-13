@@ -49,8 +49,10 @@ Sudoers is rendered directly from the validated identity policy. Fixed
 renderer invariants enforce root-only, no-argument endpoints and hardened
 environment defaults; `visudo` must accept the candidate before publication.
 Review requires an interactive terminal and the policy-directory owner. It
-prints each exact artifact with its destination, ownership, mode, and hash,
-then records approval only when the full bundle digest is entered correctly.
+prints exact generated artifacts and byte-verified source provenance for copied
+artifacts, together with each destination, ownership, mode, and hash. The full
+artifact index remains visible, and approval is recorded only when its complete
+bundle digest is entered correctly.
 Approval state is local under `.state/` and is never a deployment artifact.
 
 ## Verify

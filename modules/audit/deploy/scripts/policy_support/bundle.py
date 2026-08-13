@@ -16,7 +16,7 @@ import jsonschema
 import yaml
 
 MANIFEST_VERSION = "ai-auditor-policy-manifest/v1"
-INDEX_VERSION = "ai-auditor-artifact-index/v2"
+INDEX_VERSION = "ai-auditor-artifact-index/v1"
 POLICY_FILES = {
     "collectors": ("collectors.yaml", "collectors-v1.schema.json"),
     "deployment": ("deployment.yaml", "deployment-v1.schema.json"),
@@ -245,8 +245,10 @@ def resolve_bundle(documents: dict[str, Any], module_dir: Path
         path = bundle_path(item["destination"])
         metadata = {field: item[field]
                     for field in ("id", "destination", "owner", "group", "mode")}
+        origin = ({"source": item["source"]} if "source" in item
+                  else {"generated": item["generated"]})
         entries.append({"kind": "file", "bundle_path": path,
-                        "sha256": sha256(content), **metadata})
+                        "sha256": sha256(content), **origin, **metadata})
         contents[path] = content
     entries.sort(key=lambda item: (item["destination"], item["kind"]))
     return entries, contents

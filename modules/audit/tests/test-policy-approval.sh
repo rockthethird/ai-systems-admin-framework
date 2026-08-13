@@ -33,8 +33,17 @@ printf '%s\n' "$bundle_sha256" | script -qfec \
 
 grep -Fq 'ARTIFACT: sudoers' "$TEMP_DIR/review.log"
 grep -Fq 'DESTINATION: /etc/sudoers.d/ai-auditor' "$TEMP_DIR/review.log"
+grep -Fq 'GENERATOR: sudoers' "$TEMP_DIR/review.log"
 grep -Fq 'ai-auditor-cloud ALL=(root:root) NOPASSWD: /opt/ai-auditor/bin/report-external ""' \
     "$TEMP_DIR/review.log"
+grep -Fq 'SOURCE: runtime/collect/ai-auditor-inventory.py' "$TEMP_DIR/review.log"
+grep -Fq 'BYTE PROVENANCE: MATCHED (bundle content equals validated source)' \
+    "$TEMP_DIR/review.log"
+if grep -Fq 'collector primitive implementations do not match policy contract' \
+        "$TEMP_DIR/review.log"; then
+    echo "review printed copied Python source instead of concise provenance" >&2
+    exit 1
+fi
 grep -Fq 'ARTIFACT INDEX (exact approved bytes)' "$TEMP_DIR/review.log"
 grep -Fq "BUNDLE SHA256: $bundle_sha256" "$TEMP_DIR/review.log"
 

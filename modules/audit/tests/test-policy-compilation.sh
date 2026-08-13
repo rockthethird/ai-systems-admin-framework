@@ -48,7 +48,7 @@ assert ids == {
     "host-platform", "os-release", "scheduled-task-paths",
 }
 
-assert index["schema_version"] == "ai-auditor-artifact-index/v2"
+assert index["schema_version"] == "ai-auditor-artifact-index/v1"
 assert [item["destination"] for item in index["entries"]] == sorted(
     item["destination"] for item in index["entries"]
 )
@@ -56,6 +56,7 @@ for item in index["entries"]:
     path = artifacts / item["bundle_path"]
     assert path.is_dir() if item["kind"] == "directory" else path.is_file()
     if item["kind"] == "file":
+        assert ("source" in item) != ("generated" in item)
         assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
 files = {item["id"]: item for item in index["entries"] if item["kind"] == "file"}
 assert files["report-external"]["sha256"] == files["report-internal"]["sha256"]

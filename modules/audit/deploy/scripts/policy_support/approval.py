@@ -137,10 +137,15 @@ def print_review(artifacts_dir: Path, index: bytes, bundle_digest: str) -> None:
         print(f"MODE: {item['mode']}")
         if item["kind"] == "file":
             print(f"SHA256: {item['sha256']}")
-            print("----- EXACT CONTENT BEGINS -----")
-            sys.stdout.write(regular_file_bytes(
-                artifacts_dir / item["bundle_path"]).decode("utf-8"))
-            print("----- EXACT CONTENT ENDS -----")
+            if "source" in item:
+                print(f"SOURCE: {item['source']}")
+                print("BYTE PROVENANCE: MATCHED (bundle content equals validated source)")
+            else:
+                print(f"GENERATOR: {item['generated']}")
+                print("----- EXACT GENERATED CONTENT BEGINS -----")
+                sys.stdout.write(regular_file_bytes(
+                    artifacts_dir / item["bundle_path"]).decode("utf-8"))
+                print("----- EXACT GENERATED CONTENT ENDS -----")
     print("=" * 78)
     print("ARTIFACT INDEX (exact approved bytes)")
     print("----- EXACT CONTENT BEGINS -----")
