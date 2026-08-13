@@ -1,0 +1,81 @@
+version: ai-auditor-deployment/v1
+
+directories:
+  - destination: /opt/ai-auditor
+    owner: root
+    group: root
+    mode: "0755"
+  - destination: /opt/ai-auditor/bin
+    owner: root
+    group: root
+    mode: "0755"
+  - destination: /opt/ai-auditor/lib
+    owner: root
+    group: root
+    mode: "0755"
+  - destination: /opt/ai-auditor/policy
+    owner: root
+    group: root
+    mode: "0755"
+
+files:
+  - id: report-external
+    source: runtime/reporting/ai-auditor-report.sh
+    destination: /opt/ai-auditor/bin/report-external
+    owner: root
+    group: root
+    mode: "0755"
+  - id: report-internal
+    source: runtime/reporting/ai-auditor-report-internal.sh
+    destination: /opt/ai-auditor/bin/report-internal
+    owner: root
+    group: root
+    mode: "0755"
+  - id: collect
+    source: runtime/collect/ai-auditor-inventory.py
+    destination: /opt/ai-auditor/lib/collect.py
+    owner: root
+    group: root
+    mode: "0700"
+  - id: analyze
+    source: runtime/reporting/analyze-inventory.py
+    destination: /opt/ai-auditor/lib/analyze.py
+    owner: root
+    group: root
+    mode: "0700"
+  - id: sanitize-external
+    source: runtime/reporting/sanitize-findings.py
+    destination: /opt/ai-auditor/lib/sanitize_external.py
+    owner: root
+    group: root
+    mode: "0700"
+  - id: sanitize-internal
+    source: runtime/reporting/sanitize-findings-internal.py
+    destination: /opt/ai-auditor/lib/sanitize_internal.py
+    owner: root
+    group: root
+    mode: "0700"
+  - id: audit-policy
+    source: runtime/reporting/audit_policy.py
+    destination: /opt/ai-auditor/lib/audit_policy.py
+    owner: root
+    group: root
+    mode: "0600"
+  - id: sanitize-common
+    source: runtime/reporting/sanitize_common.py
+    destination: /opt/ai-auditor/lib/sanitize_common.py
+    owner: root
+    group: root
+    mode: "0600"
+  - id: policy-manifest
+    generated: policy-manifest
+    destination: /opt/ai-auditor/policy/manifest.json
+    owner: root
+    group: root
+    mode: "0600"
+  - id: sudoers
+    generated: sudoers
+    destination: /etc/sudoers.d/ai-auditor
+    owner: root
+    group: root
+    mode: "0440"

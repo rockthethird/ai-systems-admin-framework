@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = "1.0"
+MANIFEST_VERSION = "ai-auditor-policy-manifest/v1"
+MANIFEST_PATH = Path(__file__).resolve().parent.parent / "policy" / "manifest.json"
 COMMAND_TIMEOUT_SECONDS = 10
 MAX_LINES = 5000
 MAX_STREAM_BYTES = 1024 * 1024
@@ -25,9 +27,18 @@ MAX_CPU_SECONDS = 5
 MAX_OPEN_FILES = 256
 MAX_FILE_BYTES = 1024 * 1024
 SAFE_ENV = {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C", "LC_ALL": "C"}
-AUDITOR_USERS = ("ai-auditor-cloud", "ai-auditor-local")
-REPORT_PATHS = ("/usr/local/libexec/ai-auditor-report", "/usr/local/libexec/ai-auditor-report-internal")
-SSH_SETTINGS = {"passwordauthentication", "kbdinteractiveauthentication", "pubkeyauthentication", "permitrootlogin"}
+LIMIT_FIELDS = {
+    "command_timeout_seconds", "max_items", "max_stream_bytes",
+    "max_cpu_seconds", "max_open_files", "max_file_bytes",
+}
+LIMIT_BOUNDS = {
+    "command_timeout_seconds": (1, 60),
+    "max_items": (1, 10000),
+    "max_stream_bytes": (1024, 4194304),
+    "max_cpu_seconds": (1, 30),
+    "max_open_files": (16, 1024),
+    "max_file_bytes": (1024, 4194304),
+}
 
 
 def unavailable(error: str = "command not found") -> dict[str, Any]:
@@ -122,19 +133,6 @@ def read_os_release() -> dict[str, str]:
     return values
 
 
-def task_paths() -> list[dict[str, Any]]:
-    paths = [Path("/etc/crontab"), Path("/etc/cron.d"), Path("/etc/cron.daily"),
-             Path("/etc/cron.hourly"), Path("/etc/cron.weekly"), Path("/etc/cron.monthly")]
-    result = []
-    for path in paths:
-        try:
-            stat = path.stat()
-            result.append({"path": str(path), "mode": oct(stat.st_mode & 0o7777), "uid": stat.st_uid, "gid": stat.st_gid})
-        except OSError:
-            continue
-    return result
-
-
 def path_metadata(path: Path) -> dict[str, Any]:
     try:
         stat = path.stat()
@@ -144,72 +142,168 @@ def path_metadata(path: Path) -> dict[str, Any]:
         return {"path": str(path), "exists": False, "mode": None, "uid": None, "gid": None}
 
 
-def ssh_posture() -> dict[str, Any]:
-    sshd = next((path for path in ("/usr/sbin/sshd", "/sbin/sshd") if os.access(path, os.X_OK)), None)
+def available(items: Any) -> dict[str, Any]:
+    return {"available": True, "items": items, "truncated": False,
+            "exit_code": 0, "error": None}
+
+
+def collect_passwd_entries(_parameters: dict[str, Any]) -> dict[str, Any]:
+    items = [{"name": entry.pw_name, "uid": entry.pw_uid, "gid": entry.pw_gid,
+              "home": entry.pw_dir, "shell": entry.pw_shell}
+             for entry in pwd.getpwall()[:MAX_LINES]]
+    return available(items)
+
+
+def collect_host_platform(_parameters: dict[str, Any]) -> dict[str, Any]:
+    return available({"hostname": platform.node(), "kernel": platform.release(),
+                      "architecture": platform.machine()})
+
+
+def collect_os_release(_parameters: dict[str, Any]) -> dict[str, Any]:
+    return available(read_os_release())
+
+
+def collect_path_metadata(parameters: dict[str, Any]) -> dict[str, Any]:
+    return available([path_metadata(Path(path)) for path in parameters["paths"]])
+
+
+def collect_ssh_settings(parameters: dict[str, Any]) -> dict[str, Any]:
+    paths = parameters["executable_paths"]
+    settings_wanted = set(parameters["settings"])
+    sshd = next((path for path in paths if os.access(path, os.X_OK)), None)
     if sshd is None:
-        return {"available": False, "users": [], "error": "sshd not found"}
+        return unavailable("sshd not found")
     users = []
-    for name in AUDITOR_USERS:
+    for name in parameters["users"]:
         result = run([sshd, "-T", "-C", f"user={name},host=localhost,addr=127.0.0.1"])
         settings = {}
         if result["available"] and result["exit_code"] == 0 and not result["truncated"]:
             for line in result["items"]:
                 key, _, value = line.partition(" ")
-                if key in SSH_SETTINGS:
+                if key in settings_wanted:
                     settings[key] = value.strip()
-        users.append({"name": name, "available": set(settings) == SSH_SETTINGS, "settings": settings})
-    return {"available": all(user["available"] for user in users), "users": users, "error": None}
+        users.append({"name": name, "available": set(settings) == settings_wanted,
+                      "settings": settings})
+    if not all(user["available"] for user in users):
+        return unavailable("effective SSH settings were incomplete")
+    return available(users)
 
 
-def auditor_paths() -> list[dict[str, Any]]:
+def collect_account_paths(parameters: dict[str, Any]) -> dict[str, Any]:
     result = []
-    accounts = {entry.pw_name: entry for entry in pwd.getpwall() if entry.pw_name in AUDITOR_USERS}
-    for name in AUDITOR_USERS:
+    users = parameters["users"]
+    accounts = {entry.pw_name: entry for entry in pwd.getpwall() if entry.pw_name in users}
+    for name in users:
         entry = accounts.get(name)
         if entry is None:
-            result.append({"name": name, "exists": False, "uid": None, "shell": None, "home": None,
-                           "home_metadata": None, "authorized_keys_metadata": None})
+            result.append({"name": name, "exists": False, "uid": None, "shell": None,
+                           "home": None, "paths": {}})
             continue
         home = Path(entry.pw_dir)
-        result.append({"name": name, "exists": True, "uid": entry.pw_uid, "shell": entry.pw_shell, "home": entry.pw_dir,
+        result.append({"name": name, "exists": True, "uid": entry.pw_uid,
+                       "shell": entry.pw_shell, "home": entry.pw_dir,
                        "home_metadata": path_metadata(home),
-                       "authorized_keys_metadata": path_metadata(home / ".ssh" / "authorized_keys")})
-    return result
+                       "paths": {relative: path_metadata(home / relative)
+                                 for relative in parameters["relative_paths"]}})
+    return available(result)
+
+
+PRIMITIVES = {
+    "passwd-entries": collect_passwd_entries,
+    "host-platform": collect_host_platform,
+    "os-release": collect_os_release,
+    "path-metadata": collect_path_metadata,
+    "ssh-effective-settings": collect_ssh_settings,
+    "account-path-metadata": collect_account_paths,
+}
+
+
+def load_collectors(manifest_path: Path) -> tuple[dict[str, int], list[dict[str, Any]]]:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict) or manifest.get("version") != MANIFEST_VERSION:
+        raise ValueError("unsupported audit policy manifest")
+    policy = manifest.get("collectors")
+    if not isinstance(policy, dict) or set(policy) != {"version", "defaults", "collectors"}:
+        raise ValueError("collector policy is invalid")
+    defaults = policy["defaults"]
+    collectors = policy["collectors"]
+    if (not isinstance(defaults, dict) or set(defaults) != LIMIT_FIELDS
+            or any(not isinstance(defaults[name], int) or isinstance(defaults[name], bool)
+                   or not minimum <= defaults[name] <= maximum
+                   for name, (minimum, maximum) in LIMIT_BOUNDS.items())):
+        raise ValueError("collector limits are invalid")
+    if not isinstance(collectors, list) or not collectors:
+        raise ValueError("collector catalog is invalid")
+    seen = set()
+    for collector in collectors:
+        if not isinstance(collector, dict) or not isinstance(collector.get("id"), str):
+            raise ValueError("collector entry is invalid")
+        if collector["id"] in seen:
+            raise ValueError("collector IDs must be unique")
+        seen.add(collector["id"])
+        if collector.get("type") == "command":
+            if collector.get("parser") != "lines" or not isinstance(collector.get("candidates"), list):
+                raise ValueError(f"command collector {collector['id']} is invalid")
+            max_items = collector.get("max_items", defaults["max_items"])
+            if not isinstance(max_items, int) or isinstance(max_items, bool) or not 1 <= max_items <= 10000:
+                raise ValueError(f"command collector {collector['id']} has an invalid item limit")
+            for candidate in collector["candidates"]:
+                path, arguments = candidate.get("path"), candidate.get("args")
+                if (not isinstance(path, str) or not os.path.isabs(path)
+                        or not isinstance(arguments, list) or len(arguments) > 20
+                        or any(not isinstance(arg, str) or "\x00" in arg or len(arg) > 1000
+                               for arg in arguments)):
+                    raise ValueError(f"command collector {collector['id']} is unsafe")
+        elif collector.get("type") == "builtin":
+            if collector.get("primitive") not in PRIMITIVES:
+                raise ValueError(f"collector {collector['id']} uses an unknown primitive")
+            if not isinstance(collector.get("parameters", {}), dict):
+                raise ValueError(f"collector {collector['id']} parameters are invalid")
+        else:
+            raise ValueError(f"collector {collector['id']} has an unknown type")
+    return defaults, collectors
+
+
+def configure_limits(defaults: dict[str, int]) -> None:
+    global COMMAND_TIMEOUT_SECONDS, MAX_LINES, MAX_STREAM_BYTES
+    global MAX_CPU_SECONDS, MAX_OPEN_FILES, MAX_FILE_BYTES
+    COMMAND_TIMEOUT_SECONDS = defaults["command_timeout_seconds"]
+    MAX_LINES = defaults["max_items"]
+    MAX_STREAM_BYTES = defaults["max_stream_bytes"]
+    MAX_CPU_SECONDS = defaults["max_cpu_seconds"]
+    MAX_OPEN_FILES = defaults["max_open_files"]
+    MAX_FILE_BYTES = defaults["max_file_bytes"]
+
+
+def collect(manifest_path: Path) -> dict[str, Any]:
+    defaults, policy = load_collectors(manifest_path)
+    configure_limits(defaults)
+    results = {}
+    for collector in policy:
+        if collector["type"] == "command":
+            commands = [[candidate["path"], *candidate["args"]]
+                        for candidate in collector["candidates"]]
+            results[collector["id"]] = first_available(
+                commands, collector.get("max_items", MAX_LINES))
+        else:
+            results[collector["id"]] = PRIMITIVES[collector["primitive"]](
+                collector.get("parameters", {}))
+        results[collector["id"]]["required"] = not collector.get("optional", False)
+    return {"schema_version": SCHEMA_VERSION,
+            "collected_at": datetime.now(timezone.utc).isoformat(),
+            "limits": {"command_timeout_seconds": COMMAND_TIMEOUT_SECONDS,
+                       "max_items_per_command": MAX_LINES,
+                       "max_bytes_per_stream": MAX_STREAM_BYTES,
+                       "max_cpu_seconds": MAX_CPU_SECONDS,
+                       "max_open_files": MAX_OPEN_FILES,
+                       "max_file_bytes": MAX_FILE_BYTES},
+            "collectors": results}
 
 
 def main() -> None:
     if len(sys.argv) != 1:
         raise SystemExit("ai-auditor-inventory does not accept arguments")
-    accounts = [{"name": entry.pw_name, "uid": entry.pw_uid, "gid": entry.pw_gid,
-                 "home": entry.pw_dir, "shell": entry.pw_shell} for entry in pwd.getpwall()[:MAX_LINES]]
-    packages = first_available([["/usr/bin/dpkg-query", "-W", "-f=${binary:Package}\\t${Version}\\n"],
-                                ["/usr/bin/rpm", "-qa"], ["/bin/rpm", "-qa"]])
-    inventory = {
-        "schema_version": SCHEMA_VERSION, "collected_at": datetime.now(timezone.utc).isoformat(),
-        "limits": {"command_timeout_seconds": COMMAND_TIMEOUT_SECONDS,
-                   "max_items_per_command": MAX_LINES,
-                   "max_bytes_per_stream": MAX_STREAM_BYTES,
-                   "max_cpu_seconds": MAX_CPU_SECONDS,
-                   "max_open_files": MAX_OPEN_FILES,
-                   "max_file_bytes": MAX_FILE_BYTES},
-        "host": {"hostname": platform.node(), "kernel": platform.release(), "architecture": platform.machine(),
-                 "os_release": read_os_release(), "uptime": first_available([["/usr/bin/uptime", "-p"], ["/bin/uptime", "-p"]], 10)},
-        "filesystems": first_available([["/usr/bin/df", "-P", "-T"], ["/bin/df", "-P", "-T"]]),
-        "network": {"interfaces": first_available([["/usr/sbin/ip", "-details", "address"], ["/sbin/ip", "-details", "address"]]),
-                    "routes": first_available([["/usr/sbin/ip", "route", "show", "table", "all"], ["/sbin/ip", "route", "show", "table", "all"]]),
-                    "listening_sockets": first_available([["/usr/bin/ss", "-H", "-lntup"], ["/bin/ss", "-H", "-lntup"]])},
-        "systemd": {"failed_units": first_available([["/usr/bin/systemctl", "--no-pager", "--plain", "--failed"], ["/bin/systemctl", "--no-pager", "--plain", "--failed"]]),
-                    "timers": first_available([["/usr/bin/systemctl", "--no-pager", "--plain", "list-timers", "--all"], ["/bin/systemctl", "--no-pager", "--plain", "list-timers", "--all"]]),
-                    "enabled_units": first_available([["/usr/bin/systemctl", "--no-pager", "--plain", "list-unit-files", "--state=enabled"], ["/bin/systemctl", "--no-pager", "--plain", "list-unit-files", "--state=enabled"]])},
-        "accounts": accounts, "packages": packages,
-        "security": {"ssh": ssh_posture(), "auditor_accounts": auditor_paths(),
-                     "report_endpoints": [path_metadata(Path(path)) for path in REPORT_PATHS]},
-        # Docker daemon visibility is sensitive and intentionally optional.
-        "containers": first_available([["/usr/bin/docker", "ps", "--all", "--no-trunc", "--format", "{{json .}}"],
-                                       ["/usr/local/bin/docker", "ps", "--all", "--no-trunc", "--format", "{{json .}}"]]),
-        "scheduled_tasks": task_paths(),
-    }
-    json.dump(inventory, sys.stdout, sort_keys=True)
+    json.dump(collect(MANIFEST_PATH), sys.stdout, sort_keys=True)
     sys.stdout.write("\n")
 
 

@@ -9,12 +9,13 @@
   "$defs": {
     "rule": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "control", "title", "severity", "category", "source", "section", "evaluator", "passed", "rationale", "impact", "recommendation"],
+      "required": ["id", "control", "title", "severity", "confidence", "category", "source", "section", "evaluator", "passed", "rationale", "impact", "recommendation"],
       "properties": {
         "id": {"type": "string", "pattern": "^AIA-[0-9]{4}$"},
         "control": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
         "title": {"type": "string", "minLength": 1, "maxLength": 200},
         "severity": {"enum": ["critical", "high", "medium", "low", "info"]},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
         "category": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
         "source": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
         "section": {"type": "string", "pattern": "^[a-z][a-z0-9._-]*$"},

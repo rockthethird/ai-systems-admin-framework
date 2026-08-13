@@ -3,8 +3,8 @@ version: ai-auditor-identities/v1
 identities:
   - user: ai-auditor-cloud
     profile: external-safe/v1
-    endpoint: /usr/local/libexec/ai-auditor-report
+    endpoint: /opt/ai-auditor/bin/report-external
 
   - user: ai-auditor-local
     profile: internal-rich/v1
-    endpoint: /usr/local/libexec/ai-auditor-report-internal
+    endpoint: /opt/ai-auditor/bin/report-internal

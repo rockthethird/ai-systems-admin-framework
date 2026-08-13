@@ -21,27 +21,14 @@ import jsonschema
 import yaml
 
 MANIFEST_VERSION = "ai-auditor-policy-manifest/v1"
-INDEX_VERSION = "ai-auditor-artifact-index/v1"
+INDEX_VERSION = "ai-auditor-artifact-index/v2"
 APPROVAL_FILE = "policy-approval.json"
 POLICY_FILES = {
     "collectors": ("collectors.yaml", "collectors-v1.schema.json"),
+    "deployment": ("deployment.yaml", "deployment-v1.schema.json"),
     "identities": ("identities.yaml", "identities-v1.schema.json"),
     "profiles": ("profiles.yaml", "profiles-v1.schema.json"),
     "rules": ("rules.yaml", "rules-v1.schema.json"),
-}
-ARTIFACTS = {
-    "policy-manifest.json": {
-        "destination": "/usr/local/libexec/ai-auditor-policy-manifest.json",
-        "owner": "root",
-        "group": "root",
-        "mode": "0600",
-    },
-    "sudoers-ai-auditor": {
-        "destination": "/etc/sudoers.d/ai-auditor",
-        "owner": "root",
-        "group": "root",
-        "mode": "0440",
-    },
 }
 EXTERNAL_REQUIRED_EXCLUSIONS = {
     "raw-inventory", "host-identity", "collection-timestamps",
@@ -49,6 +36,8 @@ EXTERNAL_REQUIRED_EXCLUSIONS = {
 }
 BUILTIN_PARAMETERS = {
     "passwd-entries": set(),
+    "host-platform": set(),
+    "os-release": set(),
     "ssh-effective-settings": {"users", "settings", "executable_paths"},
     "account-path-metadata": {"users", "relative_paths"},
     "path-metadata": {"paths"},
@@ -103,6 +92,7 @@ def validate_policy(documents: dict[str, Any]) -> None:
     rules = documents["rules"]["rules"]
     profiles = documents["profiles"]["profiles"]
     identities = documents["identities"]["identities"]
+    deployment = documents["deployment"]
 
     collector_ids = unique(collectors, "id", "collector")
     unique(rules, "id", "rule")
@@ -110,6 +100,12 @@ def validate_policy(documents: dict[str, Any]) -> None:
     profile_ids = unique(profiles, "id", "profile")
     unique(identities, "user", "identity")
     unique(identities, "endpoint", "identity")
+    unique(deployment["files"], "id", "deployment file")
+    file_destinations = unique(deployment["files"], "destination", "deployment file")
+    directory_destinations = unique(
+        deployment["directories"], "destination", "deployment directory")
+    if file_destinations & directory_destinations:
+        fail("deployment destination cannot be both a file and directory")
 
     for collector in collectors:
         if collector["type"] == "command":
@@ -118,17 +114,6 @@ def validate_policy(documents: dict[str, Any]) -> None:
                     fail(f"collector {collector['id']} command is not absolute")
                 if any("\x00" in argument for argument in command["args"]):
                     fail(f"collector {collector['id']} contains a NUL argument")
-                if any(token in argument for argument in command["args"]
-                       for token in ("$(", "`", "${", "{{", "}}")):
-                    fail(f"collector {collector['id']} contains interpolation or template syntax")
-                output_mode = command.get("output_mode")
-                if output_mode == "dpkg-package-lines" and not (
-                        command["path"] == "/usr/bin/dpkg-query" and command["args"] == ["-W"]):
-                    fail("dpkg-package-lines is valid only for the fixed dpkg-query command")
-                if output_mode == "docker-json-lines" and not (
-                        command["path"] in {"/usr/bin/docker", "/usr/local/bin/docker"}
-                        and command["args"] == ["ps", "--all", "--no-trunc"]):
-                    fail("docker-json-lines is valid only for the fixed docker ps command")
         else:
             expected = BUILTIN_PARAMETERS[collector["primitive"]]
             actual = set(collector.get("parameters", {}))
@@ -140,6 +125,23 @@ def validate_policy(documents: dict[str, Any]) -> None:
             for value in collector.get("parameters", {}).get("executable_paths", []):
                 if not value.startswith("/"):
                     fail(f"collector {collector['id']} executable path is not absolute")
+            for value in collector.get("parameters", {}).get("relative_paths", []):
+                if Path(value).is_absolute() or ".." in Path(value).parts:
+                    fail(f"collector {collector['id']} relative path escapes its account home")
+
+    generated = [item["generated"] for item in deployment["files"] if "generated" in item]
+    if sorted(generated) != ["policy-manifest", "sudoers"]:
+        fail("deployment must contain exactly one policy-manifest and sudoers generator")
+    for item in deployment["files"]:
+        destination = item["destination"]
+        if destination.startswith("/opt/ai-auditor/"):
+            parent = str(Path(destination).parent)
+            if parent not in directory_destinations:
+                fail(f"deployment file parent is not declared: {destination}")
+    endpoints = {item["destination"] for item in deployment["files"]
+                 if item["mode"] == "0755"}
+    if {identity["endpoint"] for identity in identities} - endpoints:
+        fail("identity endpoint is not a declared executable deployment file")
 
     for rule in rules:
         if rule["source"] != "all-required-collectors" and rule["source"] not in collector_ids:
@@ -209,55 +211,145 @@ def validate_sudoers(path: Path) -> None:
         fail(f"generated sudoers failed validation:\n{result.stdout.rstrip()}")
 
 
-def build_index(policy_sha256: str, contents: dict[str, bytes]) -> bytes:
-    artifacts = []
-    for name, metadata in ARTIFACTS.items():
-        artifacts.append({"file": name, "sha256": sha256(contents[name]), **metadata})
-    artifacts.sort(key=lambda item: item["destination"])
+def validate_runtime(entries: list[dict[str, str]], contents: dict[str, bytes],
+                     validation_dir: Path) -> None:
+    for entry in entries:
+        if entry["kind"] != "file":
+            continue
+        destination = entry["destination"]
+        content = contents[entry["bundle_path"]]
+        if destination.endswith(".py"):
+            compile(content, destination, "exec")
+        elif destination.startswith("/opt/ai-auditor/bin/"):
+            candidate = validation_dir / entry["id"]
+            write_staged(candidate, content, 0o700)
+            result = subprocess.run(["/usr/bin/bash", "-n", str(candidate)], check=False)
+            if result.returncode:
+                fail(f"runtime shell syntax is invalid: {destination}")
+
+
+def source_bytes(module_dir: Path, relative: str) -> bytes:
+    source = module_dir.joinpath(*Path(relative).parts)
+    current = module_dir
+    for part in Path(relative).parts:
+        current /= part
+        if current.is_symlink():
+            fail(f"deployment source cannot be a symlink: {relative}")
+    resolved_module = module_dir.resolve(strict=True)
+    resolved_source = source.resolve(strict=True)
+    if resolved_source.parent != resolved_module and resolved_module not in resolved_source.parents:
+        fail(f"deployment source escapes the audit module: {relative}")
+    if not resolved_source.is_file():
+        fail(f"deployment source is not a regular file: {relative}")
+    return resolved_source.read_bytes()
+
+
+def bundle_path(destination: str) -> str:
+    return "rootfs" + destination
+
+
+def resolve_bundle(documents: dict[str, Any], module_dir: Path
+                   ) -> tuple[list[dict[str, str]], dict[str, bytes]]:
+    generated = {
+        "policy-manifest": compile_manifest(documents),
+        "sudoers": render_sudoers(documents),
+    }
+    entries = []
+    contents = {}
+    for directory in documents["deployment"]["directories"]:
+        entries.append({"kind": "directory", "bundle_path": bundle_path(directory["destination"]),
+                        **directory})
+    for item in documents["deployment"]["files"]:
+        content = (source_bytes(module_dir, item["source"])
+                   if "source" in item else generated[item["generated"]])
+        path = bundle_path(item["destination"])
+        metadata = {field: item[field]
+                    for field in ("id", "destination", "owner", "group", "mode")}
+        entries.append({"kind": "file", "bundle_path": path,
+                        "sha256": sha256(content), **metadata})
+        contents[path] = content
+    entries.sort(key=lambda item: (item["destination"], item["kind"]))
+    return entries, contents
+
+
+def build_index(policy_sha256: str, entries: list[dict[str, str]]) -> bytes:
     return canonical_json({
         "schema_version": INDEX_VERSION,
         "policy_sha256": policy_sha256,
-        "artifacts": artifacts,
+        "entries": entries,
     })
 
 
-def render_bundle(policy_dir: Path, validation_dir: Path) -> tuple[dict[str, bytes], bytes, str]:
+def render_bundle(policy_dir: Path, module_dir: Path, validation_dir: Path
+                  ) -> tuple[list[dict[str, str]], dict[str, bytes], bytes, str]:
     documents, policy_digest = load_policy(policy_dir)
     validate_policy(documents)
-    contents = {
-        "policy-manifest.json": compile_manifest(documents),
-        "sudoers-ai-auditor": render_sudoers(documents),
-    }
-    sudoers = validation_dir / "sudoers-ai-auditor"
-    write_staged(sudoers, contents["sudoers-ai-auditor"])
+    entries, contents = resolve_bundle(documents, module_dir)
+    validate_runtime(entries, contents, validation_dir)
+    sudoers_entry = next(item for item in entries if item.get("id") == "sudoers")
+    sudoers = validation_dir / "sudoers"
+    write_staged(sudoers, contents[sudoers_entry["bundle_path"]], 0o644)
     validate_sudoers(sudoers)
-    return contents, build_index(policy_digest, contents), policy_digest
+    return entries, contents, build_index(policy_digest, entries), policy_digest
 
 
-def write_staged(path: Path, content: bytes) -> None:
+def write_staged(path: Path, content: bytes, mode: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(content)
-    path.chmod(0o644)
+    path.chmod(mode)
 
 
-def build(policy_dir: Path, artifacts_dir: Path) -> tuple[str, str]:
+def stage_bundle(stage_dir: Path, entries: list[dict[str, str]],
+                 contents: dict[str, bytes], index: bytes) -> None:
+    for entry in entries:
+        path = stage_dir / entry["bundle_path"]
+        mode = int(entry["mode"], 8)
+        if entry["kind"] == "directory":
+            path.mkdir(parents=True, exist_ok=True)
+            path.chmod(mode)
+        else:
+            write_staged(path, contents[entry["bundle_path"]], mode)
+    for structural in (stage_dir / "rootfs", stage_dir / "rootfs/opt",
+                       stage_dir / "rootfs/etc", stage_dir / "rootfs/etc/sudoers.d"):
+        structural.chmod(0o755)
+    write_staged(stage_dir / "artifact-index.json", index, 0o644)
+
+
+def activate_build(stage_dir: Path, artifacts_dir: Path) -> None:
+    rootfs = artifacts_dir / "rootfs"
+    backup = artifacts_dir / ".rootfs-previous"
+    if backup.exists():
+        shutil.rmtree(backup)
+    if rootfs.exists():
+        os.replace(rootfs, backup)
+    try:
+        os.replace(stage_dir / "rootfs", rootfs)
+        os.replace(stage_dir / "artifact-index.json", artifacts_dir / "artifact-index.json")
+    except BaseException:
+        if not rootfs.exists() and backup.exists():
+            os.replace(backup, rootfs)
+        raise
+    if backup.exists():
+        shutil.rmtree(backup)
+
+
+def build(policy_dir: Path, module_dir: Path, artifacts_dir: Path) -> tuple[str, str]:
     artifacts_dir.mkdir(parents=True, exist_ok=True, mode=0o755)
     artifacts_dir.chmod(0o755)
     with tempfile.TemporaryDirectory(prefix=".build-", dir=artifacts_dir) as temporary:
         stage_dir = Path(temporary)
-        contents, index, policy_digest = render_bundle(policy_dir, stage_dir)
-        for name, content in contents.items():
-            write_staged(stage_dir / name, content)
-        write_staged(stage_dir / "artifact-index.json", index)
-        for name in ARTIFACTS:
-            os.replace(stage_dir / name, artifacts_dir / name)
-        os.replace(stage_dir / "artifact-index.json", artifacts_dir / "artifact-index.json")
+        entries, contents, index, policy_digest = render_bundle(
+            policy_dir, module_dir, stage_dir)
+        stage_bundle(stage_dir, entries, contents, index)
+        activate_build(stage_dir, artifacts_dir)
 
     return policy_digest, sha256(index)
 
 
-def expected_bundle(policy_dir: Path) -> tuple[dict[str, bytes], bytes, str]:
+def expected_bundle(policy_dir: Path, module_dir: Path
+                    ) -> tuple[list[dict[str, str]], dict[str, bytes], bytes, str]:
     with tempfile.TemporaryDirectory(prefix="ai-auditor-verify-") as temporary:
-        return render_bundle(policy_dir, Path(temporary))
+        return render_bundle(policy_dir, module_dir, Path(temporary))
 
 
 def regular_file_bytes(path: Path) -> bytes:
@@ -322,11 +414,45 @@ def human_approval_status(policy_dir: Path, state_dir: Path, policy_digest: str,
     return "MATCHED"
 
 
-def verify(policy_dir: Path, artifacts_dir: Path, state_dir: Path) -> tuple[str, str]:
-    contents, index, policy_digest = expected_bundle(policy_dir)
-    for name, expected in contents.items():
-        if regular_file_bytes(artifacts_dir / name) != expected:
-            fail(f"artifact does not match validated policy: {artifacts_dir / name}")
+def verify_tree(artifacts_dir: Path, entries: list[dict[str, str]],
+                contents: dict[str, bytes]) -> None:
+    rootfs = artifacts_dir / "rootfs"
+    expected_paths = {entry["bundle_path"] for entry in entries}
+    structural_paths = set()
+    for expected in expected_paths:
+        parent = Path(expected).parent
+        while parent != Path("rootfs"):
+            structural_paths.add(str(parent))
+            parent = parent.parent
+    actual_paths = {str(path.relative_to(artifacts_dir))
+                    for path in rootfs.rglob("*")} if rootfs.is_dir() else set()
+    allowed_paths = expected_paths | structural_paths
+    if actual_paths != allowed_paths:
+        fail(f"artifact rootfs does not match the deployment index; "
+             f"missing={sorted(allowed_paths - actual_paths)}, "
+             f"unexpected={sorted(actual_paths - allowed_paths)}")
+    for relative in structural_paths:
+        path = artifacts_dir / relative
+        if path.is_symlink() or not path.is_dir():
+            fail(f"artifact structural path is not a real directory: {path}")
+    for entry in entries:
+        path = artifacts_dir / entry["bundle_path"]
+        if path.is_symlink():
+            fail(f"artifact cannot be a symlink: {path}")
+        expected_mode = int(entry["mode"], 8)
+        if stat.S_IMODE(path.stat().st_mode) != expected_mode:
+            fail(f"artifact has unexpected mode: {path}")
+        if entry["kind"] == "directory":
+            if not path.is_dir():
+                fail(f"required artifact is not a directory: {path}")
+        elif regular_file_bytes(path) != contents[entry["bundle_path"]]:
+            fail(f"artifact does not match validated source: {path}")
+
+
+def verify(policy_dir: Path, module_dir: Path, artifacts_dir: Path,
+           state_dir: Path) -> tuple[str, str]:
+    entries, contents, index, policy_digest = expected_bundle(policy_dir, module_dir)
+    verify_tree(artifacts_dir, entries, contents)
     if regular_file_bytes(artifacts_dir / "artifact-index.json") != index:
         fail("artifact index does not match the reconstructed bundle")
 
@@ -338,18 +464,20 @@ def verify(policy_dir: Path, artifacts_dir: Path, state_dir: Path) -> tuple[str,
 
 
 def print_review(artifacts_dir: Path, index: bytes, bundle_digest: str) -> None:
-    metadata = {item["file"]: item for item in json.loads(index)["artifacts"]}
-    for name in sorted(ARTIFACTS, key=lambda item: metadata[item]["destination"]):
-        item = metadata[name]
+    entries = json.loads(index)["entries"]
+    for item in entries:
         print("=" * 78)
-        print(f"ARTIFACT: {name}")
+        print(f"ARTIFACT: {item['id'] if item['kind'] == 'file' else item['bundle_path']}")
+        print(f"KIND: {item['kind']}")
         print(f"DESTINATION: {item['destination']}")
         print(f"OWNER: {item['owner']}:{item['group']}")
         print(f"MODE: {item['mode']}")
-        print(f"SHA256: {item['sha256']}")
-        print("----- EXACT CONTENT BEGINS -----")
-        sys.stdout.write(regular_file_bytes(artifacts_dir / name).decode("utf-8"))
-        print("----- EXACT CONTENT ENDS -----")
+        if item["kind"] == "file":
+            print(f"SHA256: {item['sha256']}")
+            print("----- EXACT CONTENT BEGINS -----")
+            sys.stdout.write(regular_file_bytes(
+                artifacts_dir / item["bundle_path"]).decode("utf-8"))
+            print("----- EXACT CONTENT ENDS -----")
     print("=" * 78)
     print("ARTIFACT INDEX (exact approved bytes)")
     print("----- EXACT CONTENT BEGINS -----")
@@ -394,19 +522,18 @@ def write_approval(policy_dir: Path, state_dir: Path, policy_digest: str,
         raise
 
 
-def review(policy_dir: Path, artifacts_dir: Path, state_dir: Path) -> tuple[str, str]:
+def review(policy_dir: Path, module_dir: Path, artifacts_dir: Path,
+           state_dir: Path) -> tuple[str, str]:
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         fail("review requires an interactive terminal on stdin and stdout")
     if os.geteuid() != policy_dir.stat().st_uid:
         fail("review must run as the account that owns the policy directory")
 
-    policy_digest, bundle_digest = build(policy_dir, artifacts_dir)
-    contents, index, expected_policy_digest = expected_bundle(policy_dir)
+    policy_digest, bundle_digest = build(policy_dir, module_dir, artifacts_dir)
+    entries, contents, index, expected_policy_digest = expected_bundle(policy_dir, module_dir)
     if policy_digest != expected_policy_digest:
         fail("policy changed while preparing review")
-    for name, expected in contents.items():
-        if regular_file_bytes(artifacts_dir / name) != expected:
-            fail(f"artifact changed while preparing review: {name}")
+    verify_tree(artifacts_dir, entries, contents)
     if regular_file_bytes(artifacts_dir / "artifact-index.json") != index:
         fail("artifact index changed while preparing review")
 
@@ -424,6 +551,7 @@ def parse_args() -> argparse.Namespace:
     commands = parser.add_subparsers(dest="command", required=True)
     def paths(command: argparse.ArgumentParser) -> None:
         command.add_argument("--policy-dir", type=Path, default=deploy_dir / "policy")
+        command.add_argument("--module-dir", type=Path, default=deploy_dir.parent)
         command.add_argument("--artifacts-dir", type=Path, default=deploy_dir / "artifacts")
         command.add_argument("--state-dir", type=Path, default=deploy_dir / ".state")
 
@@ -440,18 +568,21 @@ def main() -> int:
     args = parse_args()
     try:
         if args.command == "build":
-            policy_digest, bundle_digest = build(args.policy_dir, args.artifacts_dir)
+            policy_digest, bundle_digest = build(
+                args.policy_dir, args.module_dir, args.artifacts_dir)
             print(f"policy_sha256: {policy_digest}")
             print(f"bundle_sha256: {bundle_digest}")
             print("human_approval_status: " + human_approval_status(
                 args.policy_dir, args.state_dir, policy_digest, bundle_digest))
         elif args.command == "verify":
-            policy_digest, bundle_digest = verify(args.policy_dir, args.artifacts_dir, args.state_dir)
+            policy_digest, bundle_digest = verify(
+                args.policy_dir, args.module_dir, args.artifacts_dir, args.state_dir)
             print(f"policy_sha256: {policy_digest}")
             print(f"bundle_sha256: {bundle_digest}")
             print("human_approval_status: MATCHED")
         elif args.command == "review":
-            policy_digest, bundle_digest = review(args.policy_dir, args.artifacts_dir, args.state_dir)
+            policy_digest, bundle_digest = review(
+                args.policy_dir, args.module_dir, args.artifacts_dir, args.state_dir)
             print(f"policy_sha256: {policy_digest}")
             print(f"bundle_sha256: {bundle_digest}")
             print("human_approval_status: MATCHED")

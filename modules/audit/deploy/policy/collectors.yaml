@@ -86,8 +86,7 @@ collectors:
     type: command
     candidates:
       - path: /usr/bin/dpkg-query
-        args: [-W]
-        output_mode: dpkg-package-lines
+        args: [-W, '-f=${binary:Package}\t${Version}\n']
       - path: /usr/bin/rpm
         args: [-qa]
       - path: /bin/rpm
@@ -99,16 +98,22 @@ collectors:
     optional: true
     candidates:
       - path: /usr/bin/docker
-        args: [ps, --all, --no-trunc]
-        output_mode: docker-json-lines
+        args: [ps, --all, --no-trunc, --format, '{{json .}}']
       - path: /usr/local/bin/docker
-        args: [ps, --all, --no-trunc]
-        output_mode: docker-json-lines
+        args: [ps, --all, --no-trunc, --format, '{{json .}}']
     parser: lines
 
   - id: accounts
     type: builtin
     primitive: passwd-entries
+
+  - id: host-platform
+    type: builtin
+    primitive: host-platform
+
+  - id: os-release
+    type: builtin
+    primitive: os-release
 
   - id: ssh-effective-settings
     type: builtin
@@ -134,5 +139,17 @@ collectors:
     primitive: path-metadata
     parameters:
       paths:
-        - /usr/local/libexec/ai-auditor-report
-        - /usr/local/libexec/ai-auditor-report-internal
+        - /opt/ai-auditor/bin/report-external
+        - /opt/ai-auditor/bin/report-internal
+
+  - id: scheduled-task-paths
+    type: builtin
+    primitive: path-metadata
+    parameters:
+      paths:
+        - /etc/crontab
+        - /etc/cron.d
+        - /etc/cron.daily
+        - /etc/cron.hourly
+        - /etc/cron.weekly
+        - /etc/cron.monthly

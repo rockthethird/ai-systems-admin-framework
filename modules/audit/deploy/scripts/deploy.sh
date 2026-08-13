@@ -85,7 +85,7 @@ validate_source_tree() {
         || fail "artifacts directory has inconsistent ownership"
     [[ "$(stat -c %a "$ARTIFACTS_DIR")" == 755 ]] \
         || fail "artifacts directory must have mode 0755"
-    for path in artifact-index.json policy-manifest.json sudoers-ai-auditor; do
+    for path in artifact-index.json; do
         path="$ARTIFACTS_DIR/$path"
         [[ -f "$path" && ! -L "$path" ]] \
             || fail "required artifact must be a regular file: $path"
@@ -182,9 +182,14 @@ main() {
     confirm_deployment
     deploy_identities
     verify_approved_bundle
-    deploy_runtime
+    stage_runtime
     verify_approved_bundle
+    trap rollback_runtime EXIT
+    activate_runtime
     deploy_sudoers
+    finish_runtime
+    remove_legacy_runtime
+    trap - EXIT
     echo "AI auditor deployment complete"
 }
 

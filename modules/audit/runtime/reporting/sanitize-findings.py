@@ -10,6 +10,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+sys.dont_write_bytecode = True
+
 from audit_policy import PROFILES, RULES
 from sanitize_common import require, sanitize_findings
 

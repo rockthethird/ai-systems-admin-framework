@@ -6,40 +6,42 @@ readonly MODULE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 readonly INVENTORY="$(mktemp)"
 readonly REPORT="$(mktemp)"
 trap 'rm -f "$INVENTORY" "$REPORT"' EXIT
+python3 "$MODULE_DIR/deploy/scripts/policy.py" build >/dev/null
+readonly ANALYZER="$MODULE_DIR/deploy/artifacts/rootfs/opt/ai-auditor/lib/analyze.py"
 
 /usr/bin/python3 - "$INVENTORY" <<'PY'
 import json
 import sys
 
-command = {"available": True, "items": [], "truncated": False, "exit_code": 0, "error": None}
+command = {"available": True, "items": [], "truncated": False, "exit_code": 0, "error": None, "required": True}
 inventory = {
     "schema_version": "1.0",
     "collected_at": "2026-08-10T18:00:00Z",
-    "host": {"hostname": "analysis-test"},
-    "filesystems": {**command, "items": [
-        "Filesystem Type 1024-blocks Used Available Capacity Mounted on",
-        "/dev/test ext4 100 95 5 95% /full",
-    ]},
-    "systemd": {"failed_units": {**command, "items": [
-        "example.service loaded failed failed Example service",
-    ]}},
-    "accounts": [
-        {"name": "root", "uid": 0},
-        {"name": "unexpected-admin", "uid": 0},
-    ],
-    "security": {
-        "ssh": {"available": True, "users": [{"name": "ai-auditor-cloud", "available": True, "settings": {"passwordauthentication": "yes", "kbdinteractiveauthentication": "no", "permitrootlogin": "prohibit-password"}}], "error": None},
-        "auditor_accounts": [{"name": "ai-auditor-cloud", "exists": True, "uid": 996, "shell": "/bin/bash", "home": "/opt/ai-auditor-cloud", "home_metadata": {"exists": True, "mode": "0o777", "uid": 996}, "authorized_keys_metadata": {"exists": False}}],
-        "report_endpoints": [{"path": "/usr/local/libexec/ai-auditor-report", "exists": True, "mode": "0o775", "uid": 1000, "gid": 1000}],
+    "collectors": {
+        "host-platform": {**command, "items": {"hostname": "analysis-test"}},
+        "filesystems": {**command, "items": [
+            "Filesystem Type 1024-blocks Used Available Capacity Mounted on",
+            "/dev/test ext4 100 95 5 95% /full",
+        ]},
+        "systemd-failed-units": {**command, "items": [
+            "example.service loaded failed failed Example service",
+        ]},
+        "accounts": {**command, "items": [
+            {"name": "root", "uid": 0},
+            {"name": "unexpected-admin", "uid": 0},
+        ]},
+        "ssh-effective-settings": {**command, "items": [{"name": "ai-auditor-cloud", "available": True, "settings": {"passwordauthentication": "yes", "kbdinteractiveauthentication": "no", "permitrootlogin": "prohibit-password"}}]},
+        "auditor-account-paths": {**command, "items": [{"name": "ai-auditor-cloud", "exists": True, "uid": 996, "shell": "/bin/bash", "home": "/opt/ai-auditor-cloud", "home_metadata": {"exists": True, "mode": "0o777", "uid": 996}, "paths": {".ssh/authorized_keys": {"exists": False}}}]},
+        "report-endpoints": {**command, "items": [{"path": "/opt/ai-auditor/bin/report-external", "exists": True, "mode": "0o775", "uid": 1000, "gid": 1000}]},
+        "packages": {**command, "truncated": True},
+        "containers": {"available": False, "items": [], "truncated": False, "exit_code": None, "error": "command not found", "required": False},
     },
-    "packages": {**command, "truncated": True},
-    "containers": {"available": False, "items": [], "truncated": False, "exit_code": None, "error": "command not found"},
 }
 with open(sys.argv[1], "w", encoding="utf-8") as stream:
     json.dump(inventory, stream)
 PY
 
-/usr/bin/python3 "$MODULE_DIR/runtime/reporting/analyze-inventory.py" "$INVENTORY" --output "$REPORT"
+/usr/bin/python3 "$ANALYZER" "$INVENTORY" --output "$REPORT"
 
 /usr/bin/python3 - "$MODULE_DIR/runtime/reporting/schema/ai-auditor-findings-v1.schema.json" "$REPORT" <<'PY'
 import json
@@ -68,7 +70,7 @@ else:
 print("inventory analysis test passed")
 PY
 
-if /usr/bin/python3 "$MODULE_DIR/runtime/reporting/analyze-inventory.py" /dev/null >/dev/null 2>&1; then
+if /usr/bin/python3 "$ANALYZER" /dev/null >/dev/null 2>&1; then
     echo "analyzer unexpectedly accepted invalid inventory" >&2
     exit 1
 fi

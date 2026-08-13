@@ -10,7 +10,7 @@
       "properties": {
         "user": {"type": "string", "pattern": "^ai-auditor-[a-z0-9-]+$"},
         "profile": {"enum": ["external-safe/v1", "internal-rich/v1"]},
-        "endpoint": {"type": "string", "pattern": "^/usr/local/libexec/ai-auditor-[a-z-]+$"}
+        "endpoint": {"enum": ["/opt/ai-auditor/bin/report-external", "/opt/ai-auditor/bin/report-internal"]}
       }
     }}
   }

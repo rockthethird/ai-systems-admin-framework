@@ -13,8 +13,7 @@ build() {
 
 build "$MODULE_DIR/deploy/policy" "$TEMP_DIR/first"
 build "$MODULE_DIR/deploy/policy" "$TEMP_DIR/second"
-cmp "$TEMP_DIR/first/policy-manifest.json" "$TEMP_DIR/second/policy-manifest.json"
-cmp "$TEMP_DIR/first/sudoers-ai-auditor" "$TEMP_DIR/second/sudoers-ai-auditor"
+diff -r "$TEMP_DIR/first/rootfs" "$TEMP_DIR/second/rootfs"
 cmp "$TEMP_DIR/first/artifact-index.json" "$TEMP_DIR/second/artifact-index.json"
 
 python3 - "$TEMP_DIR/first" <<'PY'
@@ -26,7 +25,7 @@ from pathlib import Path
 artifacts = Path(sys.argv[1])
 index_bytes = (artifacts / "artifact-index.json").read_bytes()
 index = json.loads(index_bytes)
-manifest = json.loads((artifacts / "policy-manifest.json").read_bytes())
+manifest = json.loads((artifacts / "rootfs/opt/ai-auditor/policy/manifest.json").read_bytes())
 
 assert set(manifest) == {"version", "collectors", "rules", "profiles", "identities"}
 ids = {item["id"] for item in manifest["collectors"]["collectors"]}
@@ -35,15 +34,18 @@ assert ids == {
     "network-listening-sockets", "systemd-failed-units", "systemd-timers",
     "systemd-enabled-units", "packages", "containers", "accounts",
     "ssh-effective-settings", "auditor-account-paths", "report-endpoints",
+    "host-platform", "os-release", "scheduled-task-paths",
 }
 
-assert index["schema_version"] == "ai-auditor-artifact-index/v1"
-assert [item["destination"] for item in index["artifacts"]] == sorted(
-    item["destination"] for item in index["artifacts"]
+assert index["schema_version"] == "ai-auditor-artifact-index/v2"
+assert [item["destination"] for item in index["entries"]] == sorted(
+    item["destination"] for item in index["entries"]
 )
-for item in index["artifacts"]:
-    content = (artifacts / item["file"]).read_bytes()
-    assert hashlib.sha256(content).hexdigest() == item["sha256"]
+for item in index["entries"]:
+    path = artifacts / item["bundle_path"]
+    assert path.is_dir() if item["kind"] == "directory" else path.is_file()
+    if item["kind"] == "file":
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
 print("deterministic policy bundle passed")
 PY
 

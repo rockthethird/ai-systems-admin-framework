@@ -7,6 +7,8 @@ readonly INVENTORY="$(mktemp)"
 readonly FINDINGS="$(mktemp)"
 readonly INTERNAL="$(mktemp)"
 trap 'rm -f "$INVENTORY" "$FINDINGS" "$INTERNAL"' EXIT
+python3 "$MODULE_DIR/deploy/scripts/policy.py" build >/dev/null
+readonly APP="$MODULE_DIR/deploy/artifacts/rootfs/opt/ai-auditor"
 
 /usr/bin/python3 - "$INVENTORY" <<'PY'
 import json
@@ -27,17 +29,31 @@ inventory = {
     "security": {
         "ssh": {"available": True, "users": [{"name": "ai-auditor-local", "available": True, "settings": {"passwordauthentication": "yes", "kbdinteractiveauthentication": "no", "permitrootlogin": "prohibit-password"}}], "error": None},
         "auditor_accounts": [{"name": "ai-auditor-local", "exists": True, "uid": 995, "shell": "/bin/bash", "home": "/opt/ai-auditor-local", "home_metadata": {"exists": True, "mode": "0o777", "uid": 995}, "authorized_keys_metadata": {"exists": False}}],
-        "report_endpoints": [{"path": "/usr/local/libexec/ai-auditor-report-internal", "exists": True, "mode": "0o777", "uid": 1000, "gid": 1000}],
+        "report_endpoints": [{"path": "/opt/ai-auditor/bin/report-internal", "exists": True, "mode": "0o777", "uid": 1000, "gid": 1000}],
     },
     "packages": {**command, "truncated": True, "error": "token=must-not-leak"},
     "containers": {"available": False, "items": [], "truncated": False, "exit_code": None, "error": "command not found"},
 }
+old = inventory
+required = {**command, "required": True}
+inventory = {"schema_version": old["schema_version"], "collected_at": old["collected_at"],
+             "collectors": {
+    "host-platform": {**required, "items": old["host"]},
+    "filesystems": {**old["filesystems"], "required": True},
+    "systemd-failed-units": {**old["systemd"]["failed_units"], "required": True},
+    "accounts": {**required, "items": old["accounts"]},
+    "ssh-effective-settings": {**required, "items": old["security"]["ssh"]["users"]},
+    "auditor-account-paths": {**required, "items": [{**item, "paths": {".ssh/authorized_keys": item.pop("authorized_keys_metadata")}} for item in old["security"]["auditor_accounts"]]},
+    "report-endpoints": {**required, "items": old["security"]["report_endpoints"]},
+    "packages": {**old["packages"], "required": True},
+    "containers": {**old["containers"], "required": False},
+}}
 with open(sys.argv[1], "w", encoding="utf-8") as stream:
     json.dump(inventory, stream)
 PY
 
-/usr/bin/python3 "$MODULE_DIR/runtime/reporting/analyze-inventory.py" "$INVENTORY" --output "$FINDINGS"
-/usr/bin/python3 "$MODULE_DIR/runtime/reporting/sanitize-findings-internal.py" "$FINDINGS" --output "$INTERNAL"
+/usr/bin/python3 "$APP/lib/analyze.py" "$INVENTORY" --output "$FINDINGS"
+/usr/bin/python3 "$APP/lib/sanitize_internal.py" "$FINDINGS" --output "$INTERNAL"
 
 /usr/bin/python3 - "$MODULE_DIR/runtime/reporting/schema/ai-auditor-internal-findings-v1.schema.json" "$INTERNAL" <<'PY'
 import json

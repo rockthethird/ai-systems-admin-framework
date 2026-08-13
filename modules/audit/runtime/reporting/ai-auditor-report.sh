@@ -1,10 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 umask 077
+export PYTHONDONTWRITEBYTECODE=1
 
-readonly COLLECTOR="/usr/local/libexec/ai-auditor-inventory"
-readonly ANALYZER="/usr/local/libexec/ai-auditor-analyze-inventory"
-readonly SANITIZER="/usr/local/libexec/ai-auditor-sanitize-findings"
+readonly APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly COLLECTOR="$APP_ROOT/lib/collect.py"
+readonly ANALYZER="$APP_ROOT/lib/analyze.py"
+readonly SANITIZER="$APP_ROOT/lib/sanitize_external.py"
 
 if [ "$#" -ne 0 ]; then
     echo "ai-auditor-report does not accept arguments" >&2

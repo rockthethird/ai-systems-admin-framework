@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "directories", "files"],
+  "properties": {
+    "version": {"const": "ai-auditor-deployment/v1"},
+    "directories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/directory"}
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/file"}
+    }
+  },
+  "$defs": {
+    "directory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["destination", "owner", "group", "mode"],
+      "properties": {
+        "destination": {"type": "string", "pattern": "^/opt/ai-auditor(?:/.*)?$"},
+        "owner": {"const": "root"},
+        "group": {"const": "root"},
+        "mode": {"type": "string", "pattern": "^0[0-7]{3}$"}
+      }
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "destination", "owner", "group", "mode"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "source": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\u0000]+$"},
+        "generated": {"enum": ["policy-manifest", "sudoers"]},
+        "destination": {"type": "string", "pattern": "^/(opt/ai-auditor(?:/.*)?|etc/sudoers\\.d/ai-auditor)$"},
+        "owner": {"const": "root"},
+        "group": {"const": "root"},
+        "mode": {"type": "string", "pattern": "^0[0-7]{3}$"}
+      },
+      "oneOf": [
+        {"required": ["source"], "not": {"required": ["generated"]}},
+        {"required": ["generated"], "not": {"required": ["source"]}}
+      ]
+    }
+  }
+}

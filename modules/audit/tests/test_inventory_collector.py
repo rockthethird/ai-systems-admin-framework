@@ -3,10 +3,12 @@
 
 import importlib.util
 import json
+import sys
 import tempfile
 from pathlib import Path
 
-COLLECTOR = Path(__file__).resolve().parent.parent / "runtime" / "collect" / "ai-auditor-inventory.py"
+sys.dont_write_bytecode = True
+COLLECTOR = Path(sys.argv[1])
 spec = importlib.util.spec_from_file_location("ai_auditor_inventory", COLLECTOR)
 assert spec and spec.loader
 module = importlib.util.module_from_spec(spec)
@@ -55,6 +57,19 @@ def main() -> None:
         assert observed["cpu"] == [module.MAX_CPU_SECONDS] * 2
         assert observed["file"] == [module.MAX_FILE_BYTES] * 2
         assert observed["nofile"] == [module.MAX_OPEN_FILES] * 2
+
+        manifest = Path(directory) / "manifest.json"
+        installed = COLLECTOR.parent.parent / "policy" / "manifest.json"
+        policy = json.loads(installed.read_text())
+        policy["collectors"]["collectors"].append(
+            dict(policy["collectors"]["collectors"][0]))
+        manifest.write_text(json.dumps(policy))
+        try:
+            module.load_collectors(manifest)
+        except ValueError as exc:
+            assert "unique" in str(exc)
+        else:
+            raise AssertionError("collector accepted duplicate manifest IDs")
 
     print("inventory collector boundary tests passed")
 

@@ -5,6 +5,7 @@ rules:
     control: filesystem-utilization
     title: Filesystem utilization is at or above 90%
     severity: high
+    confidence: 0.98
     category: capacity
     source: filesystems
     section: filesystems
@@ -18,6 +19,7 @@ rules:
     control: systemd-failed-units
     title: Systemd reports failed units
     severity: medium
+    confidence: 0.95
     category: service-health
     source: systemd-failed-units
     section: systemd.failed_units
@@ -31,6 +33,7 @@ rules:
     control: additional-uid-zero-accounts
     title: Additional accounts have UID 0
     severity: critical
+    confidence: 0.99
     category: identity
     source: accounts
     section: accounts
@@ -44,6 +47,7 @@ rules:
     control: inventory-completeness
     title: Inventory collection was incomplete
     severity: low
+    confidence: 1.0
     category: evidence-quality
     source: all-required-collectors
     section: collection
@@ -57,6 +61,7 @@ rules:
     control: ssh-password-authentication
     title: SSH permits password-capable authentication
     severity: high
+    confidence: 0.99
     category: access-control
     source: ssh-effective-settings
     section: security.ssh
@@ -70,6 +75,7 @@ rules:
     control: ssh-root-login
     title: SSH permits direct root login
     severity: medium
+    confidence: 0.98
     category: access-control
     source: ssh-effective-settings
     section: security.ssh
@@ -83,6 +89,7 @@ rules:
     control: auditor-interactive-shell
     title: Auditor identities have interactive shells
     severity: medium
+    confidence: 0.99
     category: access-control
     source: auditor-account-paths
     section: security.auditor_accounts
@@ -96,6 +103,7 @@ rules:
     control: report-endpoint-integrity
     title: Report endpoint integrity is not enforced
     severity: critical
+    confidence: 0.99
     category: privilege-boundary
     source: report-endpoints
     section: security.report_endpoints
@@ -109,6 +117,7 @@ rules:
     control: auditor-path-permissions
     title: Auditor account paths have unsafe permissions
     severity: high
+    confidence: 0.98
     category: file-integrity
     source: auditor-account-paths
     section: security.auditor_accounts

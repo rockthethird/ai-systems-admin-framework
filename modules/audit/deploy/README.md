@@ -4,7 +4,7 @@ Run deployment against a snapshot-backed or disposable Linux target. The scripts
 
 ## Sequence
 
-Review the four YAML files under `policy/` before generating artifacts.
+Review the five YAML files under `policy/` before generating artifacts.
 Generated files under `artifacts/` are local deployment inputs and must not
 be edited by hand.
 
@@ -28,8 +28,9 @@ sudo modules/audit/deploy/scripts/deploy.sh
 The public deployment interface is `scripts/deploy.sh`. Non-executable stage
 libraries under `scripts/lib/` implement identity, runtime, and sudoers work;
 they are not independent operator entry points. Preflight completes before any
-permanent change. Each artifact is verified again immediately before its
-installing stage, and each file is activated through an atomic rename.
+permanent change. The complete application tree is staged from the approved
+`artifacts/rootfs/`, verified again, and atomically activated under
+`/opt/ai-auditor`. Sudoers is activated only after the application succeeds.
 
 An interactive deployment warns on a dirty Git checkout and defaults to abort;
 the administrator may explicitly answer `y` or `yes` to test the patch.
@@ -55,18 +56,19 @@ Approval state is local under `.state/` and is never a deployment artifact.
 ## Verify
 
 ```bash
-sudo -u ai-auditor-cloud sudo -n /usr/local/libexec/ai-auditor-report > /tmp/external-findings.json
-sudo -u ai-auditor-local sudo -n /usr/local/libexec/ai-auditor-report-internal > /tmp/internal-findings.json
+sudo -u ai-auditor-cloud sudo -n /opt/ai-auditor/bin/report-external > /tmp/external-findings.json
+sudo -u ai-auditor-local sudo -n /opt/ai-auditor/bin/report-internal > /tmp/internal-findings.json
 python3 -m json.tool /tmp/external-findings.json >/dev/null
 
 # These must fail.
-sudo -u ai-auditor-cloud sudo -n /usr/local/libexec/ai-auditor-report-internal
-sudo -u ai-auditor-local sudo -n /usr/local/libexec/ai-auditor-report
-sudo -u ai-auditor-cloud sudo -n /usr/local/libexec/ai-auditor-inventory
+sudo -u ai-auditor-cloud sudo -n /opt/ai-auditor/bin/report-internal
+sudo -u ai-auditor-local sudo -n /opt/ai-auditor/bin/report-external
+sudo -u ai-auditor-cloud sudo -n /opt/ai-auditor/lib/collect.py
 sudo -u ai-auditor-local sudo -n /bin/sh -c id
 
 sudo visudo -c -f /etc/sudoers.d/ai-auditor
-sudo stat -c '%U:%G %a %n' /usr/local/libexec/ai-auditor-{inventory,analyze-inventory,sanitize-findings,report} /etc/sudoers.d/ai-auditor
+sudo find /opt/ai-auditor -printf '%u:%g %m %p\n'
+sudo stat -c '%U:%G %a %n' /etc/sudoers.d/ai-auditor
 sudo -l -U ai-auditor-cloud
 sudo -l -U ai-auditor-local
 ```
@@ -80,8 +82,8 @@ currently provided.
 
 ## Rollback
 
-The sudoers deployment stage keeps timestamped backups of an existing rule.
-Restore a reviewed backup with `install -o root -g root -m 0440`, validate it
-with `visudo`, and atomically rename it into place. Removing a service account
-or the active sudoers file is destructive and should be done explicitly by an
-administrator.
+Deployment retains the previous application tree only until the new tree and
+sudoers rule activate successfully; failures during that transaction restore
+the previous tree. Longer-term rollback requires rebuilding and approving the
+desired Git revision. Removing an identity or active sudoers file remains an
+explicit administrator action.

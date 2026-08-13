@@ -11,7 +11,7 @@
 
 ## Trust boundaries
 
-The AI and its prompt/input are untrusted. The fixed collector, analyzer, sanitizer, their root-owned installation paths, the generated sudoers rule, Python runtime, operating system tools, and target administrator are trusted. Collector JSON is sensitive evidence and remains untrusted input when consumed by later analysis.
+The AI and its prompt/input are untrusted. The approved collector manifest, bounded primitive registry, analyzer, sanitizer, their root-owned installation tree, the generated sudoers rule, Python runtime, operating system tools, and target administrator are trusted. Collector JSON is sensitive evidence and remains untrusted input when consumed by later analysis.
 
 Docker is a separate boundary. Membership in the Docker socket group or unrestricted daemon access is commonly root-equivalent. The collector invokes only a fixed `docker ps` query, but enabling daemon visibility increases disclosure and dependency risk and must be an explicit host decision.
 
@@ -96,4 +96,4 @@ rollback without weakening the approved policy.
 
 ## Change rule
 
-Do not add the raw collector, a generic interpreter, shell, pager, editor, file reader, recursive search tool, package manager, container command, or user-controlled argument to sudoers. New evidence requirements should normally become fixed collector or analyzer code with explicit bounds, schema changes, tests, sanitization policy, and threat analysis.
+Do not add the raw collector, a generic interpreter, shell, pager, editor, file reader, recursive search tool, package manager, container command, or user-controlled argument to sudoers. New command evidence should normally be an exact literal collector-policy entry; new in-process capabilities require a named primitive with explicit bounds, schema changes, tests, sanitization policy, and threat analysis.

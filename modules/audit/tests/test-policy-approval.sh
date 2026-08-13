@@ -31,9 +31,9 @@ printf '%s\n' "$bundle_sha256" | script -qfec \
     "python3 '$COMPILER' review --policy-dir '$POLICY' --artifacts-dir '$ARTIFACTS' --state-dir '$STATE'" \
     "$TEMP_DIR/review.log" >/dev/null
 
-grep -Fq 'ARTIFACT: sudoers-ai-auditor' "$TEMP_DIR/review.log"
+grep -Fq 'ARTIFACT: sudoers' "$TEMP_DIR/review.log"
 grep -Fq 'DESTINATION: /etc/sudoers.d/ai-auditor' "$TEMP_DIR/review.log"
-grep -Fq 'ai-auditor-cloud ALL=(root:root) NOPASSWD: /usr/local/libexec/ai-auditor-report ""' \
+grep -Fq 'ai-auditor-cloud ALL=(root:root) NOPASSWD: /opt/ai-auditor/bin/report-external ""' \
     "$TEMP_DIR/review.log"
 grep -Fq 'ARTIFACT INDEX (exact approved bytes)' "$TEMP_DIR/review.log"
 grep -Fq "BUNDLE SHA256: $bundle_sha256" "$TEMP_DIR/review.log"
@@ -52,14 +52,25 @@ printf '%s\n' incorrect-digest | script -qfec \
     /dev/null >/dev/null 2>&1 || true
 cmp "$TEMP_DIR/approval" "$STATE/policy-approval.json"
 
-cp "$ARTIFACTS/sudoers-ai-auditor" "$TEMP_DIR/sudoers"
-printf '\n# tampered\n' >> "$ARTIFACTS/sudoers-ai-auditor"
+readonly SUDOERS="$ARTIFACTS/rootfs/etc/sudoers.d/ai-auditor"
+cp "$SUDOERS" "$TEMP_DIR/sudoers"
+chmod u+w "$SUDOERS"
+printf '\n# tampered\n' >> "$SUDOERS"
 if python3 "$COMPILER" verify --policy-dir "$POLICY" \
         --artifacts-dir "$ARTIFACTS" --state-dir "$STATE" >/dev/null 2>&1; then
     echo "verification accepted a modified artifact" >&2
     exit 1
 fi
-cp "$TEMP_DIR/sudoers" "$ARTIFACTS/sudoers-ai-auditor"
+cp "$TEMP_DIR/sudoers" "$SUDOERS"
+chmod 0440 "$SUDOERS"
+
+touch "$ARTIFACTS/rootfs/unexpected"
+if python3 "$COMPILER" verify --policy-dir "$POLICY" \
+        --artifacts-dir "$ARTIFACTS" --state-dir "$STATE" >/dev/null 2>&1; then
+    echo "verification accepted an undeclared rootfs entry" >&2
+    exit 1
+fi
+rm "$ARTIFACTS/rootfs/unexpected"
 
 printf '\n' >> "$POLICY/identities.yaml"
 build_output="$(python3 "$COMPILER" build --policy-dir "$POLICY" \

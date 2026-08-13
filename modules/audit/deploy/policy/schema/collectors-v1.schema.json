@@ -29,7 +29,7 @@
         "parser": {"enum": ["lines"]},
         "max_items": {"type": "integer", "minimum": 1, "maximum": 10000},
         "optional": {"type": "boolean"},
-        "primitive": {"enum": ["passwd-entries", "ssh-effective-settings", "account-path-metadata", "path-metadata"]},
+        "primitive": {"enum": ["passwd-entries", "host-platform", "os-release", "ssh-effective-settings", "account-path-metadata", "path-metadata"]},
         "parameters": {"type": "object"}
       },
       "allOf": [
@@ -41,8 +41,7 @@
       "type": "object", "additionalProperties": false, "required": ["path", "args"],
       "properties": {
         "path": {"type": "string", "pattern": "^/[^\\u0000]*$"},
-        "args": {"type": "array", "items": {"type": "string", "pattern": "^[^\\u0000]*$"}, "maxItems": 20},
-        "output_mode": {"enum": ["dpkg-package-lines", "docker-json-lines"]}
+        "args": {"type": "array", "items": {"type": "string", "pattern": "^[^\\u0000]*$", "maxLength": 1000}, "maxItems": 20}
       }
     }
   }

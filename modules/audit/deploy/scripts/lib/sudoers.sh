@@ -1,6 +1,6 @@
 # Sudoers preflight and deployment stage. Sourced by deploy.sh.
 
-readonly SUDOERS_SOURCE="$ARTIFACTS_DIR/sudoers-ai-auditor"
+readonly SUDOERS_SOURCE="$ARTIFACTS_DIR/rootfs/etc/sudoers.d/ai-auditor"
 readonly SUDOERS_DIR="/etc/sudoers.d"
 readonly SUDOERS_TARGET="$SUDOERS_DIR/ai-auditor"
 
@@ -14,16 +14,13 @@ preflight_sudoers() {
 }
 
 deploy_sudoers() {
-    local candidate backup
+    local candidate
     echo "Deploying approved sudoers policy"
     candidate="$(mktemp "$SUDOERS_DIR/.ai-auditor.XXXXXX")"
-    trap "rm -f -- '$candidate'" EXIT
     install -o root -g root -m 0440 "$SUDOERS_SOURCE" "$candidate"
-    visudo -c -f "$candidate" >/dev/null || fail "installed sudoers candidate is invalid"
-    if [[ -f "$SUDOERS_TARGET" ]]; then
-        backup="$SUDOERS_TARGET.backup.$(date -u +%Y%m%d-%H%M%S)"
-        install -o root -g root -m 0440 "$SUDOERS_TARGET" "$backup"
+    if ! visudo -c -f "$candidate" >/dev/null; then
+        rm -f -- "$candidate"
+        fail "installed sudoers candidate is invalid"
     fi
     mv -f "$candidate" "$SUDOERS_TARGET"
-    trap - EXIT
 }

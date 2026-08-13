@@ -71,10 +71,12 @@ def sanitize_findings(report: dict[str, Any], transform_evidence: FindingEvidenc
                 f"finding {identifier} has invalid status")
         require(isinstance(confidence, (int, float)) and not isinstance(confidence, bool)
                 and 0 <= confidence <= 1, f"finding {identifier} has invalid confidence")
+        require(confidence == rule["confidence"],
+                f"finding {identifier} has unexpected confidence")
         require(isinstance(evidence, list) and evidence, f"finding {identifier} has no evidence")
         public = {field: rule[field] for field in PUBLIC_FIELDS}
         safe_findings.append({"id": identifier, **public, "status": status,
-                              "confidence": confidence,
+                              "confidence": rule["confidence"],
                               "evidence": transform_evidence(identifier, evidence)})
         counts[rule["severity"]] += 1
     summary = {"total": len(safe_findings), **counts}

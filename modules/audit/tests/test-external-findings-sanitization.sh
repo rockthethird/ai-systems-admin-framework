@@ -9,6 +9,8 @@ readonly EXTERNAL="$(mktemp)"
 readonly PIPELINED="$(mktemp)"
 readonly TAMPERED="$(mktemp)"
 trap 'rm -f "$INVENTORY" "$FINDINGS" "$EXTERNAL" "$PIPELINED" "$TAMPERED"' EXIT
+python3 "$MODULE_DIR/deploy/scripts/policy.py" build >/dev/null
+readonly APP="$MODULE_DIR/deploy/artifacts/rootfs/opt/ai-auditor"
 
 /usr/bin/python3 - "$INVENTORY" <<'PY'
 import json
@@ -38,13 +40,28 @@ inventory = {
     "packages": {**command, "truncated": True},
     "containers": {"available": False, "items": [], "truncated": False, "exit_code": None, "error": "secret socket path"},
 }
+old = inventory
+required = {**command, "required": True}
+inventory = {"schema_version": old["schema_version"], "collected_at": old["collected_at"],
+             "collectors": {
+    "host-platform": {**required, "items": old["host"]},
+    "filesystems": {**old["filesystems"], "required": True},
+    "systemd-failed-units": {**old["systemd"]["failed_units"], "required": True},
+    "accounts": {**required, "items": old["accounts"]},
+    "ssh-effective-settings": {**required, "items": old["security"]["ssh"]["users"]},
+    "auditor-account-paths": {**required, "items": [{**item, "paths": {".ssh/authorized_keys": item.pop("authorized_keys_metadata")}} for item in old["security"]["auditor_accounts"]]},
+    "report-endpoints": {**required, "items": old["security"]["report_endpoints"]},
+    "packages": {**old["packages"], "required": True},
+    "containers": {**old["containers"], "required": False},
+}}
 with open(sys.argv[1], "w", encoding="utf-8") as stream:
     json.dump(inventory, stream)
 PY
 
-/usr/bin/python3 "$MODULE_DIR/runtime/reporting/analyze-inventory.py" "$INVENTORY" --output "$FINDINGS"
-/usr/bin/python3 "$MODULE_DIR/runtime/reporting/sanitize-findings.py" "$FINDINGS" --output "$EXTERNAL"
-"$MODULE_DIR/runtime/reporting/prepare-external-report.sh" "$INVENTORY" > "$PIPELINED"
+/usr/bin/python3 "$APP/lib/analyze.py" "$INVENTORY" --output "$FINDINGS"
+/usr/bin/python3 "$APP/lib/sanitize_external.py" "$FINDINGS" --output "$EXTERNAL"
+/usr/bin/python3 "$APP/lib/analyze.py" "$INVENTORY" --output "$TAMPERED"
+/usr/bin/python3 "$APP/lib/sanitize_external.py" "$TAMPERED" > "$PIPELINED"
 
 /usr/bin/python3 - "$MODULE_DIR/runtime/reporting/schema/ai-auditor-external-findings-v1.schema.json" "$EXTERNAL" <<'PY'
 import json
@@ -115,8 +132,22 @@ with open(sys.argv[2], "w", encoding="utf-8") as stream:
     json.dump(report, stream)
 PY
 
-if /usr/bin/python3 "$MODULE_DIR/runtime/reporting/sanitize-findings.py" "$TAMPERED" >/dev/null 2>&1; then
+if /usr/bin/python3 "$APP/lib/sanitize_external.py" "$TAMPERED" >/dev/null 2>&1; then
     echo "sanitizer unexpectedly accepted modified public finding text" >&2
+    exit 1
+fi
+
+/usr/bin/python3 - "$FINDINGS" "$TAMPERED" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    report = json.load(stream)
+report["findings"][0]["confidence"] = 0.01
+with open(sys.argv[2], "w", encoding="utf-8") as stream:
+    json.dump(report, stream)
+PY
+if /usr/bin/python3 "$APP/lib/sanitize_external.py" "$TAMPERED" >/dev/null 2>&1; then
+    echo "sanitizer unexpectedly accepted modified finding confidence" >&2
     exit 1
 fi
 
@@ -129,12 +160,12 @@ report["assessment"]["results"][0]["status"] = "passed"
 with open(sys.argv[2], "w", encoding="utf-8") as stream:
     json.dump(report, stream)
 PY
-if /usr/bin/python3 "$MODULE_DIR/runtime/reporting/sanitize-findings.py" "$TAMPERED" >/dev/null 2>&1; then
+if /usr/bin/python3 "$APP/lib/sanitize_external.py" "$TAMPERED" >/dev/null 2>&1; then
     echo "sanitizer unexpectedly accepted assessment/finding disagreement" >&2
     exit 1
 fi
 
-if "$MODULE_DIR/runtime/reporting/prepare-external-report.sh" >/dev/null 2>&1; then
+if /usr/bin/python3 "$APP/lib/analyze.py" >/dev/null 2>&1; then
     echo "external report wrapper unexpectedly accepted missing input" >&2
     exit 1
 fi

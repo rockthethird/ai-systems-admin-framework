@@ -9,13 +9,15 @@ The module creates separate locked `ai-auditor-cloud` and `ai-auditor-local` ide
 The report includes explicit passed, failed, and unknown outcomes for nine deterministic controls, including effective SSH policy and the integrity of the report access boundary. Adaptive drill-down and remediation are not implemented. The module is alpha software and is not production-ready.
 
 Human review starts in [`deploy/policy/`](deploy/policy/). Focused YAML files define current
-collectors, controls, disclosure profiles, and identity bindings; strict schemas
-compile them into local deployment artifacts used by the reporting runtime. See
+collectors, controls, disclosure profiles, identity bindings, and the complete
+installation map; strict schemas compile them into a mirrored local deployment
+tree used by the reporting runtime. See
 [`ARCHITECTURE-DECLARATIVE-POLICY.md`](docs/ARCHITECTURE-DECLARATIVE-POLICY.md).
 
 ## Security model
 
-- Broad discovery is implemented inside one root-only, fixed collector.
+- Broad discovery is selected by the approved manifest and executed through a
+  small registry of root-only primitives and bounded literal commands.
 - Sudo permits the exact sanitized report endpoint as `root:root`; arbitrary commands, arguments, and raw collection are not granted.
 - Child commands use absolute paths, a fixed environment, a timeout, and byte/item output limits.
 - Collector and sudoers deployments validate a temporary candidate before atomic activation.
@@ -40,9 +42,9 @@ sudo modules/audit/deploy/scripts/deploy.sh --check
 sudo modules/audit/deploy/scripts/deploy.sh
 
 # Positive and negative authorization checks
-sudo -u ai-auditor-cloud sudo -n /usr/local/libexec/ai-auditor-report
-sudo -u ai-auditor-local sudo -n /usr/local/libexec/ai-auditor-report-internal
-sudo -u ai-auditor-cloud sudo -n /usr/local/libexec/ai-auditor-inventory  # must be denied
+sudo -u ai-auditor-cloud sudo -n /opt/ai-auditor/bin/report-external
+sudo -u ai-auditor-local sudo -n /opt/ai-auditor/bin/report-internal
+sudo -u ai-auditor-cloud sudo -n /opt/ai-auditor/lib/collect.py  # must be denied
 ```
 
 SSH key setup and SSH hardening are separate steps; see [deploy/README.md](deploy/README.md). Test on a snapshot or disposable host before wider use.

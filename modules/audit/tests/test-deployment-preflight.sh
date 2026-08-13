@@ -30,6 +30,7 @@ if ! sudo -n true >/dev/null 2>&1; then
 fi
 
 python3 "$POLICY" build >/dev/null
+test "$(stat -c %a "$MODULE_DIR/deploy/artifacts/rootfs/opt/ai-auditor")" = "755"
 bundle_sha256="$(sha256sum "$MODULE_DIR/deploy/artifacts/artifact-index.json" | cut -d' ' -f1)"
 printf '%s\n' "$bundle_sha256" | script -qfec "python3 '$POLICY' review" /dev/null >/dev/null
 
