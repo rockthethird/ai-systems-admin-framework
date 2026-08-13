@@ -53,6 +53,12 @@ and writes a target-shaped `rootfs/` plus its canonical artifact index under
 committed. Human review displays their exact bytes and binds approval to the
 complete bundle digest, including installation metadata.
 
+`deploy/scripts/policy.py` is the single operator entry point. Its private
+`policy_support/bundle.py` module owns validation and deterministic bundle
+construction; `policy_support/approval.py` owns exact-tree verification,
+approval records, and interactive review. The dependency flows from approval
+to bundle construction and never back into the CLI.
+
 Deployment rejects missing, stale, modified, or unmatched artifacts. The
 local artifact index retains policy provenance; the installed runtime manifest
 contains only operational policy consumed by report code.

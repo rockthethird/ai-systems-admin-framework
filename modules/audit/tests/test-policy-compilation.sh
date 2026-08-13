@@ -7,6 +7,16 @@ readonly COMPILER="$MODULE_DIR/deploy/scripts/policy.py"
 readonly TEMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
+PYTHONDONTWRITEBYTECODE=1 python3 - "$MODULE_DIR/deploy/scripts" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from policy_support import approval, bundle
+assert callable(bundle.build)
+assert callable(approval.review)
+assert callable(approval.verify)
+print("policy support imports passed")
+PY
+
 build() {
     python3 "$COMPILER" build --policy-dir "$1" --artifacts-dir "$2" >/dev/null
 }
@@ -46,6 +56,8 @@ for item in index["entries"]:
     assert path.is_dir() if item["kind"] == "directory" else path.is_file()
     if item["kind"] == "file":
         assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
+files = {item["id"]: item for item in index["entries"] if item["kind"] == "file"}
+assert files["report-external"]["sha256"] == files["report-internal"]["sha256"]
 print("deterministic policy bundle passed")
 PY
 

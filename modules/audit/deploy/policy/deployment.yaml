@@ -26,7 +26,7 @@ files:
     group: root
     mode: "0755"
   - id: report-internal
-    source: runtime/reporting/ai-auditor-report-internal.sh
+    source: runtime/reporting/ai-auditor-report.sh
     destination: /opt/ai-auditor/bin/report-internal
     owner: root
     group: root

@@ -42,17 +42,34 @@ EOF
 parse_args() {
     while (($#)); do
         case "$1" in
-            --check) CHECK_ONLY=true; shift ;;
-            --allow-dirty) ALLOW_DIRTY=true; shift ;;
-            --allow-unversioned) ALLOW_UNVERSIONED=true; shift ;;
-            --non-interactive) NON_INTERACTIVE=true; shift ;;
+            --check)
+                CHECK_ONLY=true
+                shift
+                ;;
+            --allow-dirty)
+                ALLOW_DIRTY=true
+                shift
+                ;;
+            --allow-unversioned)
+                ALLOW_UNVERSIONED=true
+                shift
+                ;;
+            --non-interactive)
+                NON_INTERACTIVE=true
+                shift
+                ;;
             --approved-sha256)
                 (($# >= 2)) || fail "--approved-sha256 requires a digest"
                 APPROVED_SHA256="$2"
                 shift 2
                 ;;
-            -h|--help) usage; exit 0 ;;
-            *) fail "unknown option: $1" ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                fail "unknown option: $1"
+                ;;
         esac
     done
     if [[ "$NON_INTERACTIVE" == true && -z "$APPROVED_SHA256" ]]; then
@@ -97,9 +114,16 @@ validate_source_tree() {
         || fail "deploy.sh must have mode 0755"
     [[ "$(stat -c %a "$POLICY_TOOL")" == 755 ]] \
         || fail "policy.py must have mode 0755"
+}
+
+validate_stage_libraries() {
+    local owner_uid path
+    owner_uid="$(stat -c %u "$DEPLOY_DIR")"
     for path in "$SCRIPT_DIR"/lib/*.sh; do
-        [[ -f "$path" && ! -L "$path" && "$(stat -c %a "$path")" == 644 ]] \
-            || fail "deployment libraries must be regular mode-0644 files: $path"
+        [[ -f "$path" && ! -L "$path" ]] \
+            || fail "deployment library must be a regular file: $path"
+        [[ "$(stat -c %u "$path")" == "$owner_uid" && "$(stat -c %a "$path")" == 644 ]] \
+            || fail "deployment library must match policy owner and mode 0644: $path"
     done
 }
 
@@ -173,7 +197,7 @@ main() {
     parse_args "$@"
     require_root
     # Validate non-executable stage libraries before loading privileged code.
-    validate_source_tree
+    validate_stage_libraries
     source "$SCRIPT_DIR/lib/identities.sh"
     source "$SCRIPT_DIR/lib/runtime.sh"
     source "$SCRIPT_DIR/lib/sudoers.sh"
