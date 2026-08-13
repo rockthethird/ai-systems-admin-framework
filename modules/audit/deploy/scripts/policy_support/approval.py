@@ -127,31 +127,83 @@ def verify(policy_dir: Path, module_dir: Path, artifacts_dir: Path,
     return policy_digest, bundle_digest
 
 
-def print_review(artifacts_dir: Path, index: bytes, bundle_digest: str) -> None:
-    for item in json.loads(index)["entries"]:
-        print("=" * 78)
-        print(f"ARTIFACT: {item['id'] if item['kind'] == 'file' else item['bundle_path']}")
-        print(f"KIND: {item['kind']}")
-        print(f"DESTINATION: {item['destination']}")
-        print(f"OWNER: {item['owner']}:{item['group']}")
-        print(f"MODE: {item['mode']}")
-        if item["kind"] == "file":
-            print(f"SHA256: {item['sha256']}")
-            if "source" in item:
-                print(f"SOURCE: {item['source']}")
-                print("BYTE PROVENANCE: MATCHED (bundle content equals validated source)")
-            else:
-                print(f"GENERATOR: {item['generated']}")
-                print("----- EXACT GENERATED CONTENT BEGINS -----")
-                sys.stdout.write(regular_file_bytes(
-                    artifacts_dir / item["bundle_path"]).decode("utf-8"))
-                print("----- EXACT GENERATED CONTENT ENDS -----")
-    print("=" * 78)
-    print("ARTIFACT INDEX (exact approved bytes)")
-    print("----- EXACT CONTENT BEGINS -----")
-    sys.stdout.write(index.decode("utf-8"))
-    print("----- EXACT CONTENT ENDS -----")
-    print(f"BUNDLE SHA256: {bundle_digest}")
+def heading(title: str) -> None:
+    print(title)
+    print("-" * len(title))
+
+
+def print_review(artifacts_dir: Path, index: bytes, policy_digest: str,
+                 bundle_digest: str) -> None:
+    entries = json.loads(index)["entries"]
+    directories = [item for item in entries if item["kind"] == "directory"]
+    files = [item for item in entries if item["kind"] == "file"]
+    generated = [item for item in files if "generated" in item]
+    copied = [item for item in files if "source" in item]
+
+    print("AI AUDITOR DEPLOYMENT REVIEW")
+    print("=" * 28)
+    print()
+    print("This report verifies bundle provenance and installation metadata.")
+    print("It does not replace reviewing source changes or generated file contents.")
+    print()
+    print(f"Artifact root : {artifacts_dir}")
+    print(f"Policy SHA-256: {policy_digest}")
+    print(f"Bundle SHA-256: {bundle_digest}")
+    print()
+
+    heading("HOW TO REVIEW")
+    print("1. Review copied source-code changes through Git.")
+    print("2. Open and inspect every file in GENERATED CONTENT REQUIRING REVIEW.")
+    print("3. Verify each file's origin, destination, ownership, mode, and bundle path.")
+    print("4. Confirm that every file reports MATCHED provenance.")
+    print("5. Approve only if this report's complete bundle digest is expected.")
+    print()
+    print("MATCHED confirms byte equality only. It does not mean that a human has")
+    print("reviewed or approved the file's security.")
+    print()
+
+    heading("SUMMARY")
+    print(f"Installation directories: {len(directories)}")
+    print(f"Copied files          : {len(copied)}")
+    print(f"Generated files       : {len(generated)}")
+    print(f"Total files           : {len(files)}")
+    print()
+
+    heading("GENERATED CONTENT REQUIRING REVIEW")
+    for item in generated:
+        print(f"[ ] {item['id']}")
+        print(f"    {artifacts_dir / item['bundle_path']}")
+    print()
+    print("Inspect every file above before approving the bundle.")
+    print()
+
+    heading("INSTALLATION DIRECTORIES")
+    for item in directories:
+        print(f"{item['destination']}")
+        print(f"  Install as  : {item['owner']}:{item['group']} {item['mode']}")
+        print(f"  Bundle path : {item['bundle_path']}")
+    print()
+
+    heading("FILES - INSTALLATION METADATA AND PROVENANCE")
+    for number, item in enumerate(files, start=1):
+        print(f"[{number}/{len(files)}] {item['id']}")
+        print(f"  Destination : {item['destination']}")
+        print(f"  Install as  : {item['owner']}:{item['group']} {item['mode']}")
+        print(f"  Bundle path : {item['bundle_path']}")
+        if "source" in item:
+            print(f"  Source      : {item['source']}")
+            provenance = "bundle bytes equal validated source"
+        else:
+            print(f"  Generator   : {item['generated']}")
+            provenance = "bundle bytes equal deterministic generator output"
+        print(f"  SHA-256     : {item['sha256']}")
+        print(f"  Provenance  : MATCHED - {provenance}")
+        print()
+
+    heading("APPROVAL")
+    print(f"Artifact index: {artifacts_dir / 'artifact-index.json'}")
+    print(f"Policy SHA-256: {policy_digest}")
+    print(f"Bundle SHA-256: {bundle_digest}")
 
 
 def write_approval(policy_dir: Path, state_dir: Path, policy_digest: str,
@@ -205,8 +257,9 @@ def review(policy_dir: Path, module_dir: Path, artifacts_dir: Path,
     if regular_file_bytes(artifacts_dir / "artifact-index.json") != index:
         fail("artifact index changed while preparing review")
 
-    print_review(artifacts_dir, index, bundle_digest)
-    entered = input("Type the complete bundle SHA-256 to approve: ").strip()
+    print_review(artifacts_dir, index, policy_digest, bundle_digest)
+    entered = input(
+        "Type the complete bundle SHA-256 only after completing the review: ").strip()
     if entered != bundle_digest:
         fail("bundle digest did not match; approval was not created")
     write_approval(policy_dir, state_dir, policy_digest, bundle_digest)

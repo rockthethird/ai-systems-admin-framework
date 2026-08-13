@@ -12,7 +12,7 @@ be edited by hand.
 # Controller: build and validate the manifest and sudoers artifacts
 python3 modules/audit/deploy/scripts/policy.py build
 
-# Controller: inspect exact artifact bytes and approve their bundle digest
+# Controller: inspect local artifacts and approve their bundle digest
 python3 modules/audit/deploy/scripts/policy.py review
 
 # Controller: independently reconstruct and verify the approved bundle
@@ -49,10 +49,10 @@ Sudoers is rendered directly from the validated identity policy. Fixed
 renderer invariants enforce root-only, no-argument endpoints and hardened
 environment defaults; `visudo` must accept the candidate before publication.
 Review requires an interactive terminal and the policy-directory owner. It
-prints exact generated artifacts and byte-verified source provenance for copied
-artifacts, together with each destination, ownership, mode, and hash. The full
-artifact index remains visible, and approval is recorded only when its complete
-bundle digest is entered correctly.
+lists generated artifacts that require direct inspection and shows byte-verified
+provenance for every file, together with each local bundle path, destination,
+ownership, mode, and hash. Approval is recorded only when the complete artifact-
+index digest is entered correctly.
 Approval state is local under `.state/` and is never a deployment artifact.
 
 ## Verify

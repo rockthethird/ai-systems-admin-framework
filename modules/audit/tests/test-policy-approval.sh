@@ -31,21 +31,25 @@ printf '%s\n' "$bundle_sha256" | script -qfec \
     "python3 '$COMPILER' review --policy-dir '$POLICY' --artifacts-dir '$ARTIFACTS' --state-dir '$STATE'" \
     "$TEMP_DIR/review.log" >/dev/null
 
-grep -Fq 'ARTIFACT: sudoers' "$TEMP_DIR/review.log"
-grep -Fq 'DESTINATION: /etc/sudoers.d/ai-auditor' "$TEMP_DIR/review.log"
-grep -Fq 'GENERATOR: sudoers' "$TEMP_DIR/review.log"
-grep -Fq 'ai-auditor-cloud ALL=(root:root) NOPASSWD: /opt/ai-auditor/bin/report-external ""' \
+grep -Fq 'AI AUDITOR DEPLOYMENT REVIEW' "$TEMP_DIR/review.log"
+grep -Fq 'HOW TO REVIEW' "$TEMP_DIR/review.log"
+grep -Fq 'GENERATED CONTENT REQUIRING REVIEW' "$TEMP_DIR/review.log"
+grep -Fq 'FILES - INSTALLATION METADATA AND PROVENANCE' "$TEMP_DIR/review.log"
+grep -Fq '[ ] sudoers' "$TEMP_DIR/review.log"
+grep -Fq 'Destination : /etc/sudoers.d/ai-auditor' "$TEMP_DIR/review.log"
+grep -Fq 'Generator   : sudoers' "$TEMP_DIR/review.log"
+grep -Fq 'Source      : runtime/collect/ai-auditor-inventory.py' "$TEMP_DIR/review.log"
+grep -Fq 'Provenance  : MATCHED - bundle bytes equal validated source' \
     "$TEMP_DIR/review.log"
-grep -Fq 'SOURCE: runtime/collect/ai-auditor-inventory.py' "$TEMP_DIR/review.log"
-grep -Fq 'BYTE PROVENANCE: MATCHED (bundle content equals validated source)' \
-    "$TEMP_DIR/review.log"
-if grep -Fq 'collector primitive implementations do not match policy contract' \
+grep -Fq 'MATCHED confirms byte equality only.' "$TEMP_DIR/review.log"
+grep -Fq "Artifact index: $ARTIFACTS/artifact-index.json" "$TEMP_DIR/review.log"
+grep -Fq "Bundle SHA-256: $bundle_sha256" "$TEMP_DIR/review.log"
+if grep -Fq 'ai-auditor-cloud ALL=(root:root) NOPASSWD:' "$TEMP_DIR/review.log" \
+        || grep -Fq 'collector primitive implementations do not match policy contract' \
         "$TEMP_DIR/review.log"; then
-    echo "review printed copied Python source instead of concise provenance" >&2
+    echo "review printed artifact contents instead of concise metadata" >&2
     exit 1
 fi
-grep -Fq 'ARTIFACT INDEX (exact approved bytes)' "$TEMP_DIR/review.log"
-grep -Fq "BUNDLE SHA256: $bundle_sha256" "$TEMP_DIR/review.log"
 
 test "$(stat -c %a "$STATE")" = "700"
 test "$(stat -c %a "$STATE/policy-approval.json")" = "600"
