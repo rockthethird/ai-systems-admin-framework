@@ -32,21 +32,29 @@ printf '%s\n' "$bundle_sha256" | script -qfec \
     "$TEMP_DIR/review.log" >/dev/null
 
 grep -Fq 'AI AUDITOR DEPLOYMENT REVIEW' "$TEMP_DIR/review.log"
-grep -Fq 'HOW TO REVIEW' "$TEMP_DIR/review.log"
-grep -Fq 'GENERATED CONTENT REQUIRING REVIEW' "$TEMP_DIR/review.log"
-grep -Fq 'FILES - INSTALLATION METADATA AND PROVENANCE' "$TEMP_DIR/review.log"
-grep -Fq '[ ] sudoers' "$TEMP_DIR/review.log"
-grep -Fq 'Destination : /etc/sudoers.d/ai-auditor' "$TEMP_DIR/review.log"
-grep -Fq 'Generator   : sudoers' "$TEMP_DIR/review.log"
-grep -Fq 'Source      : runtime/collect/ai-auditor-inventory.py' "$TEMP_DIR/review.log"
-grep -Fq 'Provenance  : MATCHED - bundle bytes equal validated source' \
+grep -Fq 'AUTOMATED VALIDATION - PASSED' "$TEMP_DIR/review.log"
+grep -Fq 'HUMAN REVIEW REQUIRED' "$TEMP_DIR/review.log"
+grep -Fq 'FILES TO OPEN' "$TEMP_DIR/review.log"
+grep -Fq 'INSTALLATION PLAN' "$TEMP_DIR/review.log"
+grep -Fq 'OPTIONAL INDEPENDENT HASH VERIFICATION' "$TEMP_DIR/review.log"
+grep -Fq '[ ] '"$POLICY"'/collectors.yaml' "$TEMP_DIR/review.log"
+grep -Fq '[ ] '"$MODULE_DIR"'/runtime/collect/ai-auditor-inventory.py' \
     "$TEMP_DIR/review.log"
-grep -Fq 'MATCHED confirms byte equality only.' "$TEMP_DIR/review.log"
+grep -Fq '[ ] '"$ARTIFACTS"'/artifact-index.json' "$TEMP_DIR/review.log"
+grep -Fq '[ ] '"$ARTIFACTS"'/rootfs/etc/sudoers.d/ai-auditor' "$TEMP_DIR/review.log"
+grep -Fq '[ ] '"$ARTIFACTS"'/rootfs/opt/ai-auditor/policy/manifest.json' \
+    "$TEMP_DIR/review.log"
+grep -Fq 'Destination     : /etc/sudoers.d/ai-auditor' "$TEMP_DIR/review.log"
+grep -Fq 'Origin          : generator sudoers' "$TEMP_DIR/review.log"
+grep -Fq 'Origin          : source runtime/collect/ai-auditor-inventory.py' \
+    "$TEMP_DIR/review.log"
+grep -Fq 'Reference SHA-256: ' "$TEMP_DIR/review.log"
+grep -Fq "sha256sum -- $ARTIFACTS/artifact-index.json" "$TEMP_DIR/review.log"
 grep -Fq "Artifact index: $ARTIFACTS/artifact-index.json" "$TEMP_DIR/review.log"
 grep -Fq "Bundle SHA-256: $bundle_sha256" "$TEMP_DIR/review.log"
 if grep -Fq 'ai-auditor-cloud ALL=(root:root) NOPASSWD:' "$TEMP_DIR/review.log" \
         || grep -Fq 'collector primitive implementations do not match policy contract' \
-        "$TEMP_DIR/review.log"; then
+        "$TEMP_DIR/review.log" || grep -Fq '  Provenance  :' "$TEMP_DIR/review.log"; then
     echo "review printed artifact contents instead of concise metadata" >&2
     exit 1
 fi

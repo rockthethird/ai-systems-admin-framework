@@ -6,12 +6,14 @@ import datetime
 import json
 import os
 import pwd
+import shlex
 import stat
 import sys
 import tempfile
 from pathlib import Path
 
 from .bundle import (
+    POLICY_FILES,
     build,
     canonical_json,
     expected_bundle,
@@ -132,76 +134,110 @@ def heading(title: str) -> None:
     print("-" * len(title))
 
 
-def print_review(artifacts_dir: Path, index: bytes, policy_digest: str,
-                 bundle_digest: str) -> None:
+def print_paths(paths: list[Path]) -> None:
+    for path in paths:
+        print(f"[ ] {path}")
+
+
+def print_field(label: str, value: object) -> None:
+    print(f"  {label:<16}: {value}")
+
+
+def print_review(policy_dir: Path, module_dir: Path, artifacts_dir: Path,
+                 index: bytes, policy_digest: str, bundle_digest: str) -> None:
     entries = json.loads(index)["entries"]
     directories = [item for item in entries if item["kind"] == "directory"]
     files = [item for item in entries if item["kind"] == "file"]
     generated = [item for item in files if "generated" in item]
     copied = [item for item in files if "source" in item]
+    policy_sources = sorted(
+        [policy_dir / policy_name for policy_name, _ in POLICY_FILES.values()]
+        + [policy_dir / "schema" / schema_name for _, schema_name in POLICY_FILES.values()])
+    runtime_sources = sorted({module_dir / item["source"] for item in copied})
+    generated_outputs = [artifacts_dir / "artifact-index.json"] + [
+        artifacts_dir / item["bundle_path"] for item in generated]
 
     print("AI AUDITOR DEPLOYMENT REVIEW")
     print("=" * 28)
     print()
-    print("This report verifies bundle provenance and installation metadata.")
-    print("It does not replace reviewing source changes or generated file contents.")
+    print("Automated checks establish integrity. Human review establishes trust in")
+    print("the code, generated content, and requested installation plan.")
     print()
     print(f"Artifact root : {artifacts_dir}")
     print(f"Policy SHA-256: {policy_digest}")
     print(f"Bundle SHA-256: {bundle_digest}")
     print()
 
-    heading("HOW TO REVIEW")
-    print("1. Review copied source-code changes through Git.")
-    print("2. Open and inspect every file in GENERATED CONTENT REQUIRING REVIEW.")
-    print("3. Verify each file's origin, destination, ownership, mode, and bundle path.")
-    print("4. Confirm that every file reports MATCHED provenance.")
-    print("5. Approve only if this report's complete bundle digest is expected.")
+    heading("AUTOMATED VALIDATION - PASSED")
+    print("The review command has already verified that:")
+    print("- policy structure and security invariants are valid;")
+    print("- the artifact tree and index match a deterministic rebuild;")
+    print("- copied files exactly match their validated repository sources;")
+    print("- generated files exactly match deterministic generator output; and")
+    print("- Python, shell, and sudoers validation succeeded.")
     print()
-    print("MATCHED confirms byte equality only. It does not mean that a human has")
-    print("reviewed or approved the file's security.")
+    print("Any failure above aborts review before an approval prompt is displayed.")
     print()
 
-    heading("SUMMARY")
+    heading("HUMAN REVIEW REQUIRED")
+    print("1. Use Git to review committed source, policy, compiler, and deployment changes.")
+    print("2. Open every path under FILES TO OPEN and decide whether its content is trusted.")
+    print("3. Review INSTALLATION PLAN for the intended destinations and permissions.")
+    print("4. Approve only after trusting both the file contents and installation plan.")
+    print()
+    print("The bundle digest binds that judgment to the exact files and metadata shown.")
+    print()
+
+    heading("BUNDLE SUMMARY")
     print(f"Installation directories: {len(directories)}")
     print(f"Copied files          : {len(copied)}")
     print(f"Generated files       : {len(generated)}")
     print(f"Total files           : {len(files)}")
     print()
 
-    heading("GENERATED CONTENT REQUIRING REVIEW")
-    for item in generated:
-        print(f"[ ] {item['id']}")
-        print(f"    {artifacts_dir / item['bundle_path']}")
+    heading("FILES TO OPEN")
+    print("Policy and schema source:")
+    print_paths(policy_sources)
     print()
-    print("Inspect every file above before approving the bundle.")
+    print("Runtime source copied into the bundle:")
+    print_paths(runtime_sources)
     print()
-
-    heading("INSTALLATION DIRECTORIES")
+    print("Generated deployment output:")
+    print_paths(generated_outputs)
+    print()
+    heading("INSTALLATION PLAN")
+    print("Directories:")
     for item in directories:
         print(f"{item['destination']}")
-        print(f"  Install as  : {item['owner']}:{item['group']} {item['mode']}")
-        print(f"  Bundle path : {item['bundle_path']}")
+        print_field("Install as", f"{item['owner']}:{item['group']} {item['mode']}")
+        print_field("Bundle path", item["bundle_path"])
     print()
-
-    heading("FILES - INSTALLATION METADATA AND PROVENANCE")
+    print("Files:")
     for number, item in enumerate(files, start=1):
         print(f"[{number}/{len(files)}] {item['id']}")
-        print(f"  Destination : {item['destination']}")
-        print(f"  Install as  : {item['owner']}:{item['group']} {item['mode']}")
-        print(f"  Bundle path : {item['bundle_path']}")
+        print_field("Destination", item["destination"])
+        print_field("Install as", f"{item['owner']}:{item['group']} {item['mode']}")
+        print_field("Bundle path", item["bundle_path"])
         if "source" in item:
-            print(f"  Source      : {item['source']}")
-            provenance = "bundle bytes equal validated source"
+            print_field("Origin", f"source {item['source']}")
         else:
-            print(f"  Generator   : {item['generated']}")
-            provenance = "bundle bytes equal deterministic generator output"
-        print(f"  SHA-256     : {item['sha256']}")
-        print(f"  Provenance  : MATCHED - {provenance}")
+            print_field("Origin", f"generator {item['generated']}")
+        print_field("Reference SHA-256", item["sha256"])
         print()
 
+    heading("OPTIONAL INDEPENDENT HASH VERIFICATION")
+    index_path = artifacts_dir / "artifact-index.json"
+    print("The bundle SHA-256 is the SHA-256 of the canonical artifact index.")
+    print("To verify it independently, run:")
+    print(f"  sha256sum -- {shlex.quote(str(index_path))}")
+    print(f"Expected SHA-256: {bundle_digest}")
+    print()
+    print("To verify an individual artifact, hash its local bundle path and compare")
+    print("the result with its Reference SHA-256 in INSTALLATION PLAN.")
+    print()
+
     heading("APPROVAL")
-    print(f"Artifact index: {artifacts_dir / 'artifact-index.json'}")
+    print(f"Artifact index: {index_path}")
     print(f"Policy SHA-256: {policy_digest}")
     print(f"Bundle SHA-256: {bundle_digest}")
 
@@ -257,7 +293,8 @@ def review(policy_dir: Path, module_dir: Path, artifacts_dir: Path,
     if regular_file_bytes(artifacts_dir / "artifact-index.json") != index:
         fail("artifact index changed while preparing review")
 
-    print_review(artifacts_dir, index, policy_digest, bundle_digest)
+    print_review(policy_dir, module_dir, artifacts_dir, index,
+                 policy_digest, bundle_digest)
     entered = input(
         "Type the complete bundle SHA-256 only after completing the review: ").strip()
     if entered != bundle_digest:

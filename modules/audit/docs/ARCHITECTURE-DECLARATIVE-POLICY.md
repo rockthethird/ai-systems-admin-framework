@@ -58,9 +58,10 @@ does not duplicate the supported primitive registry.
 The compiler validates YAML, resolves references, enforces security invariants,
 and writes a target-shaped `rootfs/` plus its canonical artifact index under
 `deploy/artifacts/` deterministically. These local build outputs are not
-committed. Human review identifies generated files requiring direct inspection
-and displays concise provenance for every file, then binds approval to the
-complete bundle digest, including every file byte and its installation metadata.
+committed. Automated review preparation proves artifact provenance and exact-
+tree integrity. Human review evaluates the listed source, policy, generated
+content, and installation plan before binding approval to the complete bundle
+digest, including every file byte and its installation metadata.
 
 `deploy/scripts/policy.py` is the single operator entry point. Its private
 `policy_support/bundle.py` module owns validation and deterministic bundle
@@ -73,14 +74,18 @@ local artifact index retains policy provenance; the installed runtime manifest
 contains only operational policy consumed by report code.
 
 `policy.py review` requires an interactive terminal. Its checklist points to
-each exact generated file under the local artifact tree for direct inspection.
-Every artifact displays its local bundle path, origin, destination, installation
-metadata, hash, and confirmed byte equality without repeating file contents.
-The canonical artifact index binds that provenance and every artifact hash into
-the complete bundle digest. Approval is recorded only after that digest is
-entered. `policy.py verify` independently reconstructs the expected bundle and
-requires the human approval record to match. The privileged deployment command
-repeats that verification before installation.
+the policy and schema inputs, copied runtime source, and exact generated files
+for direct inspection. Automated validation of byte provenance, deterministic
+generation, the exact artifact tree, and executable syntax completes before the
+report is shown. The human then reviews file meaning plus each intended
+destination, owner, group, and mode. Per-file hashes and a copyable artifact-
+index command support optional independent verification; they are not presented
+as semantic review tasks. The canonical artifact index binds every artifact hash
+and its installation metadata into the complete bundle digest. Approval is
+recorded only after that digest is entered. `policy.py verify` independently
+reconstructs the expected bundle and requires the human approval record to
+match. The privileged deployment command repeats that verification before
+installation.
 
 Target report code uses the Python standard library to read JSON. PyYAML and
 JSON Schema are build/test dependencies, not additions to the privileged target
