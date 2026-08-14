@@ -21,6 +21,8 @@ runtime = "\n".join(path.read_text() for path in runtime_paths)
 for rule in rules:
     for field in ("title", "rationale", "impact", "recommendation"):
         assert rule[field] not in runtime, f"{rule['id']} {field} is duplicated in runtime code"
+    assert f'evidence("{rule["section"]}"' not in runtime, \
+        f"{rule['id']} section is duplicated in evaluator code"
 collector_policy = yaml.safe_load((module / "deploy/policy/collectors.yaml").read_text())
 collector_runtime = (module / "runtime/collect/ai-auditor-inventory.py").read_text()
 for collector in collector_policy["collectors"]:

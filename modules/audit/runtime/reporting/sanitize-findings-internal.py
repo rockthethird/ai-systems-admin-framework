@@ -13,7 +13,7 @@ from typing import Any
 
 sys.dont_write_bytecode = True
 
-from audit_policy import PROFILES
+from audit_policy import PROFILES, RULES
 from sanitize_common import require, sanitize_findings
 
 INPUT_SCHEMA = "ai-auditor-findings/v1"
@@ -56,10 +56,12 @@ def safe_detail(identifier: str, observation: Any) -> str:
 
 def internal_evidence(identifier: str, evidence: list[dict[str, Any]]) -> list[dict[str, str]]:
     result = []
+    expected_section = RULES[identifier]["section"]
     for item in evidence:
         require(isinstance(item, dict), f"finding {identifier} has invalid evidence")
         section, path = item.get("section"), item.get("path")
-        require(isinstance(section, str) and section, f"finding {identifier} has invalid evidence section")
+        require(section == expected_section,
+                f"finding {identifier} has evidence outside its declared section")
         require(isinstance(path, str) and path.startswith("/") and len(path) <= 500,
                 f"finding {identifier} has invalid evidence path")
         result.append({"section": section, "path": path, "trust": "untrusted_host_evidence",

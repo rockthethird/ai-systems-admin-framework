@@ -55,7 +55,7 @@ def filesystem_threshold(rule: dict[str, Any], inventory: dict[str, Any]) -> lis
             continue
         percent = int(columns[-2][:-1])
         if percent >= 90:
-            full.append(evidence("filesystems", f"/filesystems/items/{index}",
+            full.append(evidence(rule["section"], f"/filesystems/items/{index}",
                                  f"{columns[-1]} is {percent}% utilized"))
     return full
 
@@ -67,7 +67,7 @@ def systemd_failed_units(rule: dict[str, Any], inventory: dict[str, Any]) -> lis
     for index, line in enumerate(items):
         lowered = f" {line.lower()} "
         if " failed " in lowered and not line.lstrip().startswith("UNIT "):
-            failed.append(evidence("systemd.failed_units", f"/systemd/failed_units/items/{index}", line[:500]))
+            failed.append(evidence(rule["section"], f"/systemd/failed_units/items/{index}", line[:500]))
     return failed
 
 
@@ -76,12 +76,12 @@ def additional_uid_zero_accounts(rule: dict[str, Any], inventory: dict[str, Any]
     accounts = items(inventory, rule["source"])
     for index, account in enumerate(accounts if isinstance(accounts, list) else []):
         if isinstance(account, dict) and account.get("uid") == 0 and account.get("name") != "root":
-            privileged.append(evidence("accounts", f"/accounts/{index}",
+            privileged.append(evidence(rule["section"], f"/accounts/{index}",
                                        f"account {account.get('name', '<unknown>')} has UID 0"))
     return privileged
 
 
-def inventory_completeness(_rule: dict[str, Any], inventory: dict[str, Any]) -> list[dict[str, str]]:
+def inventory_completeness(rule: dict[str, Any], inventory: dict[str, Any]) -> list[dict[str, str]]:
     issues: list[dict[str, str]] = []
 
     collectors = inventory.get("collectors", {})
@@ -90,12 +90,12 @@ def inventory_completeness(_rule: dict[str, Any], inventory: dict[str, Any]) -> 
             continue
         path = f"/collectors/{identifier}"
         if result.get("truncated"):
-            issues.append(evidence("collection", path, "collector output was truncated"))
+            issues.append(evidence(rule["section"], path, "collector output was truncated"))
         if result.get("available") and result.get("error"):
-            issues.append(evidence("collection", path,
+            issues.append(evidence(rule["section"], path,
                                    f"collector error: {str(result['error'])[:300]}"))
         if not result.get("available"):
-            issues.append(evidence("collection", path,
+            issues.append(evidence(rule["section"], path,
                                    "required collector command was unavailable"))
     return issues
 
@@ -107,7 +107,7 @@ def ssh_password_authentication(rule: dict[str, Any], inventory: dict[str, Any])
         settings = user.get("settings", {}) if isinstance(user, dict) else {}
         name = user.get("name", "unknown") if isinstance(user, dict) else "unknown"
         if settings.get("passwordauthentication") != "no" or settings.get("kbdinteractiveauthentication") != "no":
-            result.append(evidence("security.ssh", f"/security/ssh/users/{index}/settings",
+            result.append(evidence(rule["section"], f"/security/ssh/users/{index}/settings",
                                      f"password-capable SSH authentication is enabled for {name}"))
     return result
 
@@ -117,7 +117,7 @@ def ssh_root_login(rule: dict[str, Any], inventory: dict[str, Any]) -> list[dict
     for index, user in enumerate(items(inventory, rule["source"]) or []):
         settings = user.get("settings", {}) if isinstance(user, dict) else {}
         if settings.get("permitrootlogin") != "no":
-            result.append(evidence("security.ssh", f"/security/ssh/users/{index}/settings/permitrootlogin",
+            result.append(evidence(rule["section"], f"/security/ssh/users/{index}/settings/permitrootlogin",
                                    f"PermitRootLogin is {settings.get('permitrootlogin', 'unknown')}"))
     return result
 
@@ -127,7 +127,7 @@ def auditor_interactive_shell(rule: dict[str, Any], inventory: dict[str, Any]) -
     for index, account in enumerate(items(inventory, rule["source"]) or []):
         if (isinstance(account, dict) and account.get("exists")
                 and account.get("shell") not in {"/usr/sbin/nologin", "/sbin/nologin", "/bin/false"}):
-            shells.append(evidence("security.auditor_accounts",
+            shells.append(evidence(rule["section"],
                                    f"/security/auditor_accounts/{index}/shell",
                                    f"auditor account {account.get('name', 'unknown')} uses an interactive shell"))
     return shells
@@ -139,7 +139,7 @@ def auditor_path_permissions(rule: dict[str, Any], inventory: dict[str, Any]) ->
         if not isinstance(account, dict):
             continue
         if not account.get("exists"):
-            paths.append(evidence("security.auditor_accounts", f"/security/auditor_accounts/{index}",
+            paths.append(evidence(rule["section"], f"/security/auditor_accounts/{index}",
                                   f"auditor account {account.get('name', 'unknown')} is missing"))
             continue
         expected_uid = account.get("uid")
@@ -150,7 +150,7 @@ def auditor_path_permissions(rule: dict[str, Any], inventory: dict[str, Any]) ->
         except (TypeError, ValueError):
             home_mode = -1
         if not home.get("exists") or home.get("uid") != expected_uid or home_mode < 0 or home_mode & 0o022:
-            paths.append(evidence("security.auditor_accounts", f"/security/auditor_accounts/{index}/home_metadata",
+            paths.append(evidence(rule["section"], f"/security/auditor_accounts/{index}/home_metadata",
                                   f"auditor account {account.get('name', 'unknown')} home ownership or mode is unsafe"))
         if authorized.get("exists"):
             try:
@@ -158,7 +158,7 @@ def auditor_path_permissions(rule: dict[str, Any], inventory: dict[str, Any]) ->
             except (TypeError, ValueError):
                 key_mode = -1
             if authorized.get("uid") != expected_uid or key_mode < 0 or key_mode & 0o077:
-                paths.append(evidence("security.auditor_accounts", f"/security/auditor_accounts/{index}/authorized_keys_metadata",
+                paths.append(evidence(rule["section"], f"/security/auditor_accounts/{index}/authorized_keys_metadata",
                                       f"auditor account {account.get('name', 'unknown')} authorized_keys ownership or mode is unsafe"))
     return paths
 
@@ -174,7 +174,7 @@ def report_endpoint_integrity(rule: dict[str, Any], inventory: dict[str, Any]) -
         except (TypeError, ValueError):
             mode = -1
         if not endpoint.get("exists") or endpoint.get("uid") != 0 or endpoint.get("gid") != 0 or mode < 0 or mode & 0o022:
-            unsafe.append(evidence("security.report_endpoints", f"/security/report_endpoints/{index}",
+            unsafe.append(evidence(rule["section"], f"/security/report_endpoints/{index}",
                                    "a report endpoint is missing, not root-owned, or writable by non-root"))
     return unsafe
 

@@ -20,17 +20,19 @@ PROFILE = "external-safe/v1"
 PROFILE_POLICY = PROFILES[PROFILE]
 OUTPUT_SCHEMA = PROFILE_POLICY["schema"]
 TRUSTED_ENGINE = "ai-auditor-static-rules/v1"
-SAFE_SECTIONS = {rule["section"] for rule in RULES.values()}
 if PROFILE_POLICY["evidence"] != "count-and-section":
     raise ValueError("external-safe profile requires count-and-section evidence")
 
 
 def external_evidence(identifier: str, evidence: list[dict[str, Any]]) -> dict[str, Any]:
     sections = set()
+    expected_section = RULES[identifier]["section"]
     for item in evidence:
         require(isinstance(item, dict), f"finding {identifier} has invalid evidence")
         section = item.get("section")
-        sections.add(section if section in SAFE_SECTIONS else "other")
+        require(section == expected_section,
+                f"finding {identifier} has evidence outside its declared section")
+        sections.add(section)
     return {"observation_count": len(evidence), "sections": sorted(sections), "details": "withheld"}
 
 

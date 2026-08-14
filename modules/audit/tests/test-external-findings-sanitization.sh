@@ -156,6 +156,20 @@ import json
 import sys
 with open(sys.argv[1], encoding="utf-8") as stream:
     report = json.load(stream)
+report["findings"][0]["evidence"][0]["section"] = "unrelated.section"
+with open(sys.argv[2], "w", encoding="utf-8") as stream:
+    json.dump(report, stream)
+PY
+if /usr/bin/python3 "$APP/lib/sanitize_external.py" "$TAMPERED" >/dev/null 2>&1; then
+    echo "sanitizer unexpectedly accepted evidence outside its rule section" >&2
+    exit 1
+fi
+
+/usr/bin/python3 - "$FINDINGS" "$TAMPERED" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    report = json.load(stream)
 report["assessment"]["results"][0]["status"] = "passed"
 with open(sys.argv[2], "w", encoding="utf-8") as stream:
     json.dump(report, stream)

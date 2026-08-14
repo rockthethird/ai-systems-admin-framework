@@ -6,7 +6,8 @@ readonly MODULE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 readonly INVENTORY="$(mktemp)"
 readonly FINDINGS="$(mktemp)"
 readonly INTERNAL="$(mktemp)"
-trap 'rm -f "$INVENTORY" "$FINDINGS" "$INTERNAL"' EXIT
+readonly TAMPERED="$(mktemp)"
+trap 'rm -f "$INVENTORY" "$FINDINGS" "$INTERNAL" "$TAMPERED"' EXIT
 python3 "$MODULE_DIR/deploy/scripts/policy.py" build >/dev/null
 readonly APP="$MODULE_DIR/deploy/artifacts/rootfs/opt/ai-auditor"
 
@@ -88,3 +89,17 @@ assert "token=must-not-leak" not in rendered
 assert "/dev/test" not in rendered
 print("internal findings sanitization test passed")
 PY
+
+/usr/bin/python3 - "$FINDINGS" "$TAMPERED" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    report = json.load(stream)
+report["findings"][0]["evidence"][0]["section"] = "unrelated.section"
+with open(sys.argv[2], "w", encoding="utf-8") as stream:
+    json.dump(report, stream)
+PY
+if /usr/bin/python3 "$APP/lib/sanitize_internal.py" "$TAMPERED" >/dev/null 2>&1; then
+    echo "internal sanitizer unexpectedly accepted evidence outside its rule section" >&2
+    exit 1
+fi
