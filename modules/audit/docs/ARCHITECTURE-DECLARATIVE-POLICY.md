@@ -34,8 +34,9 @@ impact, recommendation, or disclosure classification into Python.
   candidates, literal arguments, limits, and named parsers.
 - `deploy/policy/rules.yaml` defines stable controls, public finding text, evidence
   dependencies, and named evaluators.
-- `deploy/policy/profiles.yaml` defines allowed disclosures and named safe evidence
-  formatters.
+- `deploy/policy/profiles.yaml` binds named report endpoints to implemented output
+  schemas and evidence modes. The output schemas and sanitizer implementations
+  enforce the exact disclosure boundary.
 - `deploy/policy/identities.yaml` binds operating-system identities to exactly one
   report profile and no-argument endpoint.
 - `deploy/policy/deployment.yaml` explicitly maps every copied or generated file

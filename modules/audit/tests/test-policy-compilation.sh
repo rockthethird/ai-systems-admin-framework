@@ -50,6 +50,19 @@ assert ids == {
     "host-platform", "os-release", "scheduled-task-paths",
 }
 identities = manifest["identities"]["identities"]
+profiles = {item["id"]: item for item in manifest["profiles"]["profiles"]}
+assert profiles == {
+    "external-safe/v1": {
+        "id": "external-safe/v1",
+        "schema": "ai-auditor-external-findings/v1",
+        "evidence": "count-and-section",
+    },
+    "internal-rich/v1": {
+        "id": "internal-rich/v1",
+        "schema": "ai-auditor-internal-findings/v1",
+        "evidence": "approved-internal-summary",
+    },
+}
 identity_users = sorted(item["user"] for item in identities)
 identity_endpoints = sorted(item["endpoint"] for item in identities)
 collectors = {item["id"]: item for item in manifest["collectors"]["collectors"]}
@@ -111,15 +124,16 @@ assert "ai-auditor-cloud ALL=" not in sudoers
 print("identity-derived collector policy passed")
 PY
 
-cp -a "$MODULE_DIR/deploy/policy" "$TEMP_DIR/unsafe"
-python3 - "$TEMP_DIR/unsafe/profiles.yaml" <<'PY'
+cp -a "$MODULE_DIR/deploy/policy" "$TEMP_DIR/profile-mismatch"
+python3 - "$TEMP_DIR/profile-mismatch/profiles.yaml" <<'PY'
 import sys
 from pathlib import Path
 path = Path(sys.argv[1])
-path.write_text(path.read_text().replace("      - raw-inventory\n", "", 1))
+path.write_text(path.read_text().replace(
+    "evidence: count-and-section", "evidence: approved-internal-summary", 1))
 PY
-if build "$TEMP_DIR/unsafe" "$TEMP_DIR/unsafe-artifacts" 2>/dev/null; then
-    echo "compiler accepted weakened external disclosure" >&2
+if build "$TEMP_DIR/profile-mismatch" "$TEMP_DIR/profile-mismatch-artifacts" 2>/dev/null; then
+    echo "compiler accepted a profile that does not match its runtime contract" >&2
     exit 1
 fi
 

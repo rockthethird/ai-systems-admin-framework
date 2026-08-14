@@ -25,10 +25,8 @@ POLICY_FILES = {
     "profiles": ("profiles.yaml", "profiles-v1.schema.json"),
     "rules": ("rules.yaml", "rules-v1.schema.json"),
 }
-EXTERNAL_REQUIRED_EXCLUSIONS = {
-    "raw-inventory", "host-identity", "collection-timestamps",
-    "evidence-paths", "evidence-values", "raw-errors",
-}
+
+
 def fail(message: str) -> None:
     raise ValueError(message)
 
@@ -159,15 +157,6 @@ def validate_policy(documents: dict[str, Any], module_dir: Path) -> None:
     for rule in rules:
         if rule["source"] != "all-required-collectors" and rule["source"] not in collector_ids:
             fail(f"rule {rule['id']} references unknown collector {rule['source']}")
-
-    for profile in profiles:
-        overlap = set(profile["include"]) & set(profile["exclude"])
-        if overlap:
-            fail(f"profile {profile['id']} both includes and excludes {sorted(overlap)}")
-        if profile["id"] == "external-safe/v1":
-            missing = EXTERNAL_REQUIRED_EXCLUSIONS - set(profile["exclude"])
-            if missing or profile["evidence"] != "count-and-section":
-                fail(f"external-safe profile weakens required disclosure exclusions: {sorted(missing)}")
 
     if {identity["profile"] for identity in identities} != profile_ids:
         fail("every profile must be bound to exactly one declared identity")
