@@ -40,7 +40,8 @@ def sanitize_assessment(report: dict[str, Any], failed_ids: set[str]) -> dict[st
                 f"assessment rule {identifier} has unexpected metadata")
         counts[status] += 1
         safe_results.append({"id": identifier, "control": rule["control"],
-                             "section": rule["section"], "status": status})
+                             "section": rule["section"], "status": status,
+                             "summary": rule["passed"] if status == "passed" else None})
     require(seen == set(RULES), "assessment omits supported rules")
     require(assessment.get("rules_evaluated") == len(results) and
             all(assessment.get(status) == count for status, count in counts.items()),

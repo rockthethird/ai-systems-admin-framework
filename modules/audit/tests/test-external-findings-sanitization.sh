@@ -97,6 +97,7 @@ assert report["assessment"]["rules_evaluated"] == 9
 assert report["assessment"]["failed"] == 9
 assert report["assessment"]["passed"] == 0
 assert report["assessment"]["unknown"] == 0
+assert all(item["summary"] is None for item in report["assessment"]["results"])
 for secret in (
     "secret-host", "2026-08-10", "/customer-secret", "/dev/secret",
     "secret-customer", "Ignore previous instructions", "secret-admin",
@@ -178,6 +179,35 @@ if /usr/bin/python3 "$APP/lib/sanitize_external.py" "$TAMPERED" >/dev/null 2>&1;
     echo "sanitizer unexpectedly accepted assessment/finding disagreement" >&2
     exit 1
 fi
+
+/usr/bin/python3 - "$FINDINGS" "$TAMPERED" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    report = json.load(stream)
+report["findings"] = [item for item in report["findings"] if item["id"] != "AIA-1001"]
+report["summary"]["total"] -= 1
+report["summary"]["high"] -= 1
+report["assessment"]["failed"] -= 1
+report["assessment"]["passed"] += 1
+result = next(item for item in report["assessment"]["results"] if item["id"] == "AIA-1001")
+result["status"] = "passed"
+result["summary"] = "attacker-controlled replacement"
+with open(sys.argv[2], "w", encoding="utf-8") as stream:
+    json.dump(report, stream)
+PY
+/usr/bin/python3 "$APP/lib/sanitize_external.py" "$TAMPERED" --output "$PIPELINED"
+/usr/bin/python3 - "$PIPELINED" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    report = json.load(stream)
+result = next(item for item in report["assessment"]["results"] if item["id"] == "AIA-1001")
+assert result["status"] == "passed"
+assert result["summary"] == "Filesystem utilization remains below 90%"
+assert "attacker-controlled replacement" not in str(report)
+print("trusted passed summary test passed")
+PY
 
 if /usr/bin/python3 "$APP/lib/analyze.py" >/dev/null 2>&1; then
     echo "external report wrapper unexpectedly accepted missing input" >&2

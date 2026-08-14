@@ -79,6 +79,7 @@ assert report["source"]["collected_at"] == "2026-08-10T21:00:00Z"
 assert report["evidence_quality"] == "degraded"
 assert report["assessment"]["rules_evaluated"] == 9
 assert report["assessment"]["failed"] == 9
+assert all(item["summary"] is None for item in report["assessment"]["results"])
 summaries = [evidence["summary"] for finding in report["findings"] for evidence in finding["evidence"]]
 assert "filesystem /srv/media is 95% utilized" in summaries
 assert "systemd unit backup.service reported a failed state" in summaries
