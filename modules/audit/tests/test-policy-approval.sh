@@ -52,9 +52,12 @@ grep -Fq 'Reference SHA-256: ' "$TEMP_DIR/review.log"
 grep -Fq "sha256sum -- $ARTIFACTS/artifact-index.json" "$TEMP_DIR/review.log"
 grep -Fq "Artifact index: $ARTIFACTS/artifact-index.json" "$TEMP_DIR/review.log"
 grep -Fq "Bundle SHA-256: $bundle_sha256" "$TEMP_DIR/review.log"
+test "$(grep -Fc 'Policy SHA-256:' "$TEMP_DIR/review.log")" -eq 1
+test "$(grep -Fc 'Bundle SHA-256:' "$TEMP_DIR/review.log")" -eq 1
 if grep -Fq 'ai-auditor-cloud ALL=(root:root) NOPASSWD:' "$TEMP_DIR/review.log" \
         || grep -Fq 'collector primitive implementations do not match policy contract' \
-        "$TEMP_DIR/review.log" || grep -Fq '  Provenance  :' "$TEMP_DIR/review.log"; then
+        "$TEMP_DIR/review.log" || grep -Fq '  Provenance  :' "$TEMP_DIR/review.log" \
+        || grep -Fq 'Artifact root :' "$TEMP_DIR/review.log"; then
     echo "review printed artifact contents instead of concise metadata" >&2
     exit 1
 fi

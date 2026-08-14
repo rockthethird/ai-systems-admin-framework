@@ -163,10 +163,6 @@ def print_review(policy_dir: Path, module_dir: Path, artifacts_dir: Path,
     print("Automated checks establish integrity. Human review establishes trust in")
     print("the code, generated content, and requested installation plan.")
     print()
-    print(f"Artifact root : {artifacts_dir}")
-    print(f"Policy SHA-256: {policy_digest}")
-    print(f"Bundle SHA-256: {bundle_digest}")
-    print()
 
     heading("AUTOMATED VALIDATION - PASSED")
     print("The review command has already verified that:")
