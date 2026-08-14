@@ -10,10 +10,12 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 PYTHONDONTWRITEBYTECODE=1 python3 - "$MODULE_DIR/deploy/scripts" <<'PY'
 import sys
 sys.path.insert(0, sys.argv[1])
-from policy_support import approval, bundle
+from policy_support import approval, bundle, review, terminal
 assert callable(bundle.build)
 assert callable(approval.review)
 assert callable(approval.verify)
+assert callable(review.run_wizard)
+assert callable(terminal.Terminal)
 print("policy support imports passed")
 PY
 

@@ -48,13 +48,30 @@ The sudoers deployment requires `visudo`; skipping validation is not an acceptab
 Sudoers is rendered directly from the validated identity policy. Fixed
 renderer invariants enforce root-only, no-argument endpoints and hardened
 environment defaults; `visudo` must accept the candidate before publication.
-Review requires an interactive terminal and the policy-directory owner. It
-reports automated integrity checks once, then separates the remaining human
-work: review committed changes, open the listed policy, source, and generated
-files, and assess the requested installation destinations and permissions. File
-hashes remain available for optional independent verification. Approval is
-recorded only when the complete artifact-index digest is entered correctly.
-Approval state is local under `.state/` and is never a deployment artifact.
+Review requires the policy-directory owner and an interactive terminal with
+alternate-screen support and at least 80 columns by 24 lines. Its six-stage
+wizard separates automated validation, policy and schema review, runtime source
+review, generated output review, installation-plan review, and final approval.
+Each stage replaces the previous display; the original terminal screen returns
+when review exits.
+
+Enter, Space, `n`, Vim motion keys, and forward arrow keys advance immediately.
+`b`, `p`, Vim motion keys, and back arrow keys return to earlier stages. `q`,
+Escape, Ctrl-C, Ctrl-D, or end-of-input abort from navigation without recording
+a new approval. A forward action at the final stage opens normal line input for
+the complete approval digest; there, Ctrl-C returns to final-stage navigation
+and Ctrl-D aborts. Stage navigation is informational, is not retained, and does
+not imply that a human completed the review.
+
+The exact policy, runtime sources, and artifact tree are checked when review
+starts, immediately before the final digest prompt, and again after the digest
+is entered. If a reviewed path is added, removed, or modified while the wizard
+is open, review aborts, identifies the affected relative paths, and requires a
+restart. The wizard never rebuilds in response to such a change. File hashes
+remain available for optional independent verification. Approval is recorded
+only when the complete artifact-index digest is entered correctly and the final
+integrity check passes. Approval state is local under `.state/` and is never a
+deployment artifact.
 
 ## Verify
 

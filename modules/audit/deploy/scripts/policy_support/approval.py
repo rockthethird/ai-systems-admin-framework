@@ -1,4 +1,4 @@
-"""Verify, display, and record human approval of exact audit bundles."""
+"""Verify and record human approval of exact audit bundles."""
 
 from __future__ import annotations
 
@@ -6,14 +6,11 @@ import datetime
 import json
 import os
 import pwd
-import shlex
 import stat
-import sys
 import tempfile
 from pathlib import Path
 
 from .bundle import (
-    POLICY_FILES,
     build,
     canonical_json,
     expected_bundle,
@@ -21,6 +18,8 @@ from .bundle import (
     regular_file_bytes,
     sha256,
 )
+from .review import run_wizard
+from .terminal import Terminal
 
 APPROVAL_FILE = "policy-approval.json"
 
@@ -117,125 +116,79 @@ def verify_tree(artifacts_dir: Path, entries: list[dict[str, str]],
 
 def verify(policy_dir: Path, module_dir: Path, artifacts_dir: Path,
            state_dir: Path) -> tuple[str, str]:
-    entries, contents, index, policy_digest = expected_bundle(policy_dir, module_dir)
-    verify_tree(artifacts_dir, entries, contents)
-    if regular_file_bytes(artifacts_dir / "artifact-index.json") != index:
-        fail("artifact index does not match the reconstructed bundle")
-
-    bundle_digest = sha256(index)
+    _, _, policy_digest, bundle_digest = validate_bundle(
+        policy_dir, module_dir, artifacts_dir)
     status = human_approval_status(policy_dir, state_dir, policy_digest, bundle_digest)
     if status != "MATCHED":
         fail(f"human approval does not match the current bundle: {status}")
     return policy_digest, bundle_digest
 
 
-def heading(title: str) -> None:
-    print(title)
-    print("-" * len(title))
+def validate_bundle(policy_dir: Path, module_dir: Path, artifacts_dir: Path
+                    ) -> tuple[list[dict[str, str]], bytes, str, str]:
+    entries, contents, index, policy_digest = expected_bundle(policy_dir, module_dir)
+    verify_tree(artifacts_dir, entries, contents)
+    if regular_file_bytes(artifacts_dir / "artifact-index.json") != index:
+        fail("artifact index does not match the reconstructed bundle")
+    return entries, index, policy_digest, sha256(index)
 
 
-def print_paths(paths: list[Path]) -> None:
+def path_fingerprint(path: Path) -> tuple[str, int, str]:
+    metadata = path.lstat()
+    mode = stat.S_IMODE(metadata.st_mode)
+    if path.is_symlink():
+        return "symlink", mode, os.readlink(path)
+    if path.is_dir():
+        return "directory", mode, ""
+    if path.is_file():
+        return "file", mode, sha256(path.read_bytes())
+    return "other", mode, ""
+
+
+def tree_snapshot(root: Path, prefix: str) -> dict[str, tuple[str, int, str]]:
+    if not os.path.lexists(root):
+        return {}
+    paths = ([root, *root.rglob("*")]
+             if not root.is_symlink() and root.is_dir() else [root])
+    snapshot = {}
     for path in paths:
-        print(f"[ ] {path}")
+        relative = path.relative_to(root)
+        label = prefix if relative == Path(".") else f"{prefix}/{relative}"
+        snapshot[label] = path_fingerprint(path)
+    return snapshot
 
 
-def print_field(label: str, value: object) -> None:
-    print(f"  {label:<16}: {value}")
+def review_snapshot(policy_dir: Path, module_dir: Path, artifacts_dir: Path,
+                    entries: list[dict[str, str]]) -> dict[str, tuple[str, int, str]]:
+    snapshot = tree_snapshot(policy_dir, "policy")
+    snapshot.update(tree_snapshot(artifacts_dir / "artifact-index.json",
+                                  "artifacts/artifact-index.json"))
+    snapshot.update(tree_snapshot(artifacts_dir / "rootfs", "artifacts/rootfs"))
+    for source in sorted({item["source"] for item in entries if "source" in item}):
+        snapshot.update(tree_snapshot(module_dir / source, source))
+    return snapshot
 
 
-def print_review(policy_dir: Path, module_dir: Path, artifacts_dir: Path,
-                 index: bytes, policy_digest: str, bundle_digest: str) -> None:
-    entries = json.loads(index)["entries"]
-    directories = [item for item in entries if item["kind"] == "directory"]
-    files = [item for item in entries if item["kind"] == "file"]
-    generated = [item for item in files if "generated" in item]
-    copied = [item for item in files if "source" in item]
-    policy_sources = sorted(
-        [policy_dir / policy_name for policy_name, _ in POLICY_FILES.values()]
-        + [policy_dir / "schema" / schema_name for _, schema_name in POLICY_FILES.values()])
-    runtime_sources = sorted({module_dir / item["source"] for item in copied})
-    generated_outputs = [artifacts_dir / "artifact-index.json"] + [
-        artifacts_dir / item["bundle_path"] for item in generated]
+def snapshot_changes(before: dict[str, tuple[str, int, str]],
+                     after: dict[str, tuple[str, int, str]]) -> list[tuple[str, str]]:
+    changes = [("REMOVED", path) for path in sorted(before.keys() - after.keys())]
+    changes.extend(("ADDED", path) for path in sorted(after.keys() - before.keys()))
+    changes.extend(("MODIFIED", path) for path in sorted(before.keys() & after.keys())
+                   if before[path] != after[path])
+    return changes
 
-    print("AI AUDITOR DEPLOYMENT REVIEW")
-    print("=" * 28)
-    print()
-    print("Automated checks establish integrity. Human review establishes trust in")
-    print("the code, generated content, and requested installation plan.")
-    print()
 
-    heading("AUTOMATED VALIDATION - PASSED")
-    print("The review command has already verified that:")
-    print("- policy structure and security invariants are valid;")
-    print("- the artifact tree and index match a deterministic rebuild;")
-    print("- copied files exactly match their validated repository sources;")
-    print("- generated files exactly match deterministic generator output; and")
-    print("- Python, shell, and sudoers validation succeeded.")
-    print()
-    print("Any failure above aborts review before an approval prompt is displayed.")
-    print()
-
-    heading("HUMAN REVIEW REQUIRED")
-    print("1. Use Git to review committed source, policy, compiler, and deployment changes.")
-    print("2. Open every path under FILES TO OPEN and decide whether its content is trusted.")
-    print("3. Review INSTALLATION PLAN for the intended destinations and permissions.")
-    print("4. Approve only after trusting both the file contents and installation plan.")
-    print()
-    print("The bundle digest binds that judgment to the exact files and metadata shown.")
-    print()
-
-    heading("BUNDLE SUMMARY")
-    print(f"Installation directories: {len(directories)}")
-    print(f"Copied files          : {len(copied)}")
-    print(f"Generated files       : {len(generated)}")
-    print(f"Total files           : {len(files)}")
-    print()
-
-    heading("FILES TO OPEN")
-    print("Policy and schema source:")
-    print_paths(policy_sources)
-    print()
-    print("Runtime source copied into the bundle:")
-    print_paths(runtime_sources)
-    print()
-    print("Generated deployment output:")
-    print_paths(generated_outputs)
-    print()
-    heading("INSTALLATION PLAN")
-    print("Directories:")
-    for item in directories:
-        print(f"{item['destination']}")
-        print_field("Install as", f"{item['owner']}:{item['group']} {item['mode']}")
-        print_field("Bundle path", item["bundle_path"])
-    print()
-    print("Files:")
-    for number, item in enumerate(files, start=1):
-        print(f"[{number}/{len(files)}] {item['id']}")
-        print_field("Destination", item["destination"])
-        print_field("Install as", f"{item['owner']}:{item['group']} {item['mode']}")
-        print_field("Bundle path", item["bundle_path"])
-        if "source" in item:
-            print_field("Origin", f"source {item['source']}")
-        else:
-            print_field("Origin", f"generator {item['generated']}")
-        print_field("Reference SHA-256", item["sha256"])
-        print()
-
-    heading("OPTIONAL INDEPENDENT HASH VERIFICATION")
-    index_path = artifacts_dir / "artifact-index.json"
-    print("The bundle SHA-256 is the SHA-256 of the canonical artifact index.")
-    print("To verify it independently, run:")
-    print(f"  sha256sum -- {shlex.quote(str(index_path))}")
-    print(f"Expected SHA-256: {bundle_digest}")
-    print()
-    print("To verify an individual artifact, hash its local bundle path and compare")
-    print("the result with its Reference SHA-256 in INSTALLATION PLAN.")
-    print()
-
-    heading("APPROVAL")
-    print(f"Artifact index: {index_path}")
-    print(f"Policy SHA-256: {policy_digest}")
-    print(f"Bundle SHA-256: {bundle_digest}")
+def fail_if_review_changed(before: dict[str, tuple[str, int, str]],
+                           after: dict[str, tuple[str, int, str]]) -> None:
+    changes = snapshot_changes(before, after)
+    if not changes:
+        return
+    detail = "\n".join(f"{kind}: {path}" for kind, path in changes)
+    fail(
+        "reviewed bundle changed during review; no new approval was recorded\n"
+        f"{detail}\n"
+        "The previous review is no longer valid. Restart the review."
+    )
 
 
 def write_approval(policy_dir: Path, state_dir: Path, policy_digest: str,
@@ -276,24 +229,42 @@ def write_approval(policy_dir: Path, state_dir: Path, policy_digest: str,
 
 def review(policy_dir: Path, module_dir: Path, artifacts_dir: Path,
            state_dir: Path) -> tuple[str, str]:
-    if not sys.stdin.isatty() or not sys.stdout.isatty():
-        fail("review requires an interactive terminal on stdin and stdout")
+    terminal = Terminal()
+    terminal.validate()
     if os.geteuid() != policy_dir.stat().st_uid:
         fail("review must run as the account that owns the policy directory")
 
-    policy_digest, bundle_digest = build(policy_dir, module_dir, artifacts_dir)
-    entries, contents, index, expected_policy_digest = expected_bundle(policy_dir, module_dir)
-    if policy_digest != expected_policy_digest:
-        fail("policy changed while preparing review")
-    verify_tree(artifacts_dir, entries, contents)
-    if regular_file_bytes(artifacts_dir / "artifact-index.json") != index:
-        fail("artifact index changed while preparing review")
+    built_policy_digest, built_bundle_digest = build(
+        policy_dir, module_dir, artifacts_dir)
+    entries, index, policy_digest, bundle_digest = validate_bundle(
+        policy_dir, module_dir, artifacts_dir)
+    if (built_policy_digest, built_bundle_digest) != (policy_digest, bundle_digest):
+        fail("bundle changed while preparing review")
+    initial_snapshot = review_snapshot(
+        policy_dir, module_dir, artifacts_dir, entries)
 
-    print_review(policy_dir, module_dir, artifacts_dir, index,
-                 policy_digest, bundle_digest)
-    entered = input(
-        "Type the complete bundle SHA-256 only after completing the review: ").strip()
-    if entered != bundle_digest:
-        fail("bundle digest did not match; approval was not created")
+    def validate_unchanged() -> None:
+        before_validation = review_snapshot(
+            policy_dir, module_dir, artifacts_dir, entries)
+        fail_if_review_changed(initial_snapshot, before_validation)
+        try:
+            _, current_index, current_policy_digest, current_bundle_digest = validate_bundle(
+                policy_dir, module_dir, artifacts_dir)
+        finally:
+            after_validation = review_snapshot(
+                policy_dir, module_dir, artifacts_dir, entries)
+            fail_if_review_changed(initial_snapshot, after_validation)
+        if (current_index != index
+                or current_policy_digest != policy_digest
+                or current_bundle_digest != bundle_digest):
+            fail(
+                "reviewed bundle changed during review; no new approval was recorded\n"
+                "MODIFIED: reconstructed artifact index\n"
+                "The previous review is no longer valid. Restart the review."
+            )
+
+    run_wizard(policy_dir, module_dir, artifacts_dir, index,
+               policy_digest, bundle_digest, validate_unchanged, terminal)
     write_approval(policy_dir, state_dir, policy_digest, bundle_digest)
+    print("Review complete: exact bundle approval recorded.")
     return policy_digest, bundle_digest
