@@ -26,6 +26,7 @@ PRIMITIVE_PARAMETERS = {
     "os-release": frozenset(),
     "ssh-effective-settings": frozenset({"users", "settings", "executable_paths"}),
     "account-path-metadata": frozenset({"users", "relative_paths"}),
+    "identity-endpoint-metadata": frozenset({"paths"}),
     "path-metadata": frozenset({"paths"}),
 }
 

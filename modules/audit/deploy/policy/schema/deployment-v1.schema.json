@@ -35,7 +35,7 @@
       "properties": {
         "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
         "source": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\u0000]+$"},
-        "generated": {"enum": ["policy-manifest", "sudoers"]},
+        "generated": {"enum": ["policy-manifest", "report-endpoint", "sudoers"]},
         "destination": {"type": "string", "pattern": "^/(opt/ai-auditor(?:/.*)?|etc/sudoers\\.d/ai-auditor)$"},
         "owner": {"const": "root"},
         "group": {"const": "root"},

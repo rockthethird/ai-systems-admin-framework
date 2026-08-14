@@ -93,7 +93,7 @@ sudo -l -U ai-auditor-cloud
 sudo -l -U ai-auditor-local
 ```
 
-Expected modes are `0700` for the raw collector, analyzer, and sanitizers; `0755` for both report endpoints; and `0440` for sudoers. Each identity sees only its assigned endpoint in `sudo -l`. SSH key binding is a separate, intentionally deferred step.
+Expected modes are `0700` for the private report runner, raw collector, analyzer, and sanitizers; `0755` for both generated report endpoints; and `0440` for sudoers. Each identity sees only its assigned endpoint in `sudo -l`. SSH key binding is a separate, intentionally deferred step.
 
 Inspect `/var/log/sudo-ai-auditor-cloud.log` and
 `/var/log/sudo-ai-auditor-local.log` if the platform's sudo build honors the

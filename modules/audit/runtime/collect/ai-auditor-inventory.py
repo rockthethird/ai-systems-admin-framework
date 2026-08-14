@@ -202,6 +202,7 @@ PRIMITIVES = {
     "passwd-entries": collect_passwd_entries,
     "host-platform": collect_host_platform,
     "os-release": collect_os_release,
+    "identity-endpoint-metadata": collect_path_metadata,
     "path-metadata": collect_path_metadata,
     "ssh-effective-settings": collect_ssh_settings,
     "account-path-metadata": collect_account_paths,

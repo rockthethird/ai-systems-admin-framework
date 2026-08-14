@@ -7,27 +7,27 @@ readonly APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly COLLECTOR="$APP_ROOT/lib/collect.py"
 readonly ANALYZER="$APP_ROOT/lib/analyze.py"
 
-case "${0##*/}" in
-    report-external)
+if [ "$#" -ne 1 ]; then
+    echo "report runner requires exactly one profile" >&2
+    exit 2
+fi
+
+case "$1" in
+    external-safe/v1)
         readonly SANITIZER="$APP_ROOT/lib/sanitize_external.py"
         readonly LOG_TAG="ai-auditor-report"
         readonly LABEL="audit report"
         ;;
-    report-internal)
+    internal-rich/v1)
         readonly SANITIZER="$APP_ROOT/lib/sanitize_internal.py"
         readonly LOG_TAG="ai-auditor-report-internal"
         readonly LABEL="internal audit report"
         ;;
     *)
-        echo "unknown AI auditor report endpoint" >&2
+        echo "unknown AI auditor report profile" >&2
         exit 2
         ;;
 esac
-
-if [ "$#" -ne 0 ]; then
-    echo "${0##*/} does not accept arguments" >&2
-    exit 2
-fi
 
 work_dir="$(/usr/bin/mktemp -d "/tmp/${LOG_TAG}.XXXXXX")"
 readonly work_dir

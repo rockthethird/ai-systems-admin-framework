@@ -124,7 +124,6 @@ def installation_screen(entries: list[dict[str, str]]) -> str:
     lines = [
         "Confirm every installation destination, owner, group, and mode.",
         header,
-        "-" * len(header),
         *rows,
     ]
     return stage_screen(5, "INSTALLATION PLAN REVIEW", lines)

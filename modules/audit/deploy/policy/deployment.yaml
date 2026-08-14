@@ -20,17 +20,23 @@ directories:
 
 files:
   - id: report-external
-    source: runtime/reporting/ai-auditor-report.sh
+    generated: report-endpoint
     destination: /opt/ai-auditor/bin/report-external
     owner: root
     group: root
     mode: "0755"
   - id: report-internal
-    source: runtime/reporting/ai-auditor-report.sh
+    generated: report-endpoint
     destination: /opt/ai-auditor/bin/report-internal
     owner: root
     group: root
     mode: "0755"
+  - id: report-runner
+    source: runtime/reporting/ai-auditor-report.sh
+    destination: /opt/ai-auditor/lib/report
+    owner: root
+    group: root
+    mode: "0700"
   - id: collect
     source: runtime/collect/ai-auditor-inventory.py
     destination: /opt/ai-auditor/lib/collect.py

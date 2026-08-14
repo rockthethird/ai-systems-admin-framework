@@ -49,6 +49,14 @@ assert ids == {
     "ssh-effective-settings", "auditor-account-paths", "report-endpoints",
     "host-platform", "os-release", "scheduled-task-paths",
 }
+identities = manifest["identities"]["identities"]
+identity_users = sorted(item["user"] for item in identities)
+identity_endpoints = sorted(item["endpoint"] for item in identities)
+collectors = {item["id"]: item for item in manifest["collectors"]["collectors"]}
+assert collectors["ssh-effective-settings"]["parameters"]["users"] == identity_users
+assert collectors["auditor-account-paths"]["parameters"]["users"] == identity_users
+assert collectors["report-endpoints"]["primitive"] == "identity-endpoint-metadata"
+assert collectors["report-endpoints"]["parameters"]["paths"] == identity_endpoints
 
 assert index["schema_version"] == "ai-auditor-artifact-index/v1"
 assert [item["destination"] for item in index["entries"]] == sorted(
@@ -61,12 +69,46 @@ for item in index["entries"]:
         assert ("source" in item) != ("generated" in item)
         assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
 files = {item["id"]: item for item in index["entries"] if item["kind"] == "file"}
-assert files["report-external"]["sha256"] == files["report-internal"]["sha256"]
+external = artifacts / files["report-external"]["bundle_path"]
+internal = artifacts / files["report-internal"]["bundle_path"]
+assert external.read_text().endswith(
+    "exec /opt/ai-auditor/lib/report external-safe/v1\n")
+assert internal.read_text().endswith(
+    "exec /opt/ai-auditor/lib/report internal-rich/v1\n")
+assert "$@" not in external.read_text() + internal.read_text()
+assert files["report-external"]["sha256"] != files["report-internal"]["sha256"]
+report_runner = artifacts / files["report-runner"]["bundle_path"]
+assert report_runner.read_bytes() == (
+    module / "runtime/reporting/ai-auditor-report.sh").read_bytes()
 collector_policy = artifacts / "rootfs/opt/ai-auditor/lib/collector_policy.py"
 assert collector_policy.read_bytes() == (module / "runtime/collect/collector_policy.py").read_bytes()
 assert files["collector-policy"]["sha256"] == hashlib.sha256(
     collector_policy.read_bytes()).hexdigest()
 print("deterministic policy bundle passed")
+PY
+
+cp -a "$MODULE_DIR/deploy/policy" "$TEMP_DIR/derived-identity"
+python3 - "$TEMP_DIR/derived-identity/identities.yaml" <<'PY'
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+path.write_text(path.read_text().replace("ai-auditor-cloud", "ai-auditor-edge"))
+PY
+build "$TEMP_DIR/derived-identity" "$TEMP_DIR/derived-identity-artifacts"
+python3 - "$TEMP_DIR/derived-identity-artifacts" <<'PY'
+import json
+import sys
+from pathlib import Path
+artifacts = Path(sys.argv[1])
+manifest = json.loads(
+    (artifacts / "rootfs/opt/ai-auditor/policy/manifest.json").read_text())
+collectors = {item["id"]: item for item in manifest["collectors"]["collectors"]}
+users = collectors["auditor-account-paths"]["parameters"]["users"]
+assert users == ["ai-auditor-edge", "ai-auditor-local"]
+sudoers = (artifacts / "rootfs/etc/sudoers.d/ai-auditor").read_text()
+assert "ai-auditor-edge ALL=" in sudoers
+assert "ai-auditor-cloud ALL=" not in sudoers
+print("identity-derived collector policy passed")
 PY
 
 cp -a "$MODULE_DIR/deploy/policy" "$TEMP_DIR/unsafe"

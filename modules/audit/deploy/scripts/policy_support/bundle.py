@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -86,6 +87,29 @@ def load_source_module(module_dir: Path, relative: str, name: str) -> types.Modu
     return module
 
 
+def resolve_identity_collectors(documents: dict[str, Any]) -> dict[str, Any]:
+    """Resolve identity-owned collector values before runtime validation."""
+    resolved = copy.deepcopy(documents)
+    identities = resolved["identities"]["identities"]
+    users = sorted(identity["user"] for identity in identities)
+    endpoints = sorted(identity["endpoint"] for identity in identities)
+
+    for collector in resolved["collectors"]["collectors"]:
+        if collector.get("type") != "builtin":
+            continue
+        primitive = collector.get("primitive")
+        parameters = collector.setdefault("parameters", {})
+        if primitive in {"ssh-effective-settings", "account-path-metadata"}:
+            if "users" in parameters:
+                fail(f"collector {collector['id']} must derive users from identities")
+            parameters["users"] = users
+        elif primitive == "identity-endpoint-metadata":
+            if parameters:
+                fail(f"collector {collector['id']} must derive paths from identities")
+            parameters["paths"] = endpoints
+    return resolved
+
+
 def validate_policy(documents: dict[str, Any], module_dir: Path) -> None:
     collector_policy = load_source_module(
         module_dir, "runtime/collect/collector_policy.py", "_ai_auditor_collector_policy")
@@ -102,6 +126,7 @@ def validate_policy(documents: dict[str, Any], module_dir: Path) -> None:
     unique(rules, "control", "rule")
     profile_ids = unique(profiles, "id", "profile")
     unique(identities, "user", "identity")
+    unique(identities, "profile", "identity")
     unique(identities, "endpoint", "identity")
     unique(deployment["files"], "id", "deployment file")
     file_destinations = unique(deployment["files"], "destination", "deployment file")
@@ -111,8 +136,16 @@ def validate_policy(documents: dict[str, Any], module_dir: Path) -> None:
         fail("deployment destination cannot be both a file and directory")
 
     generated = [item["generated"] for item in deployment["files"] if "generated" in item]
-    if sorted(generated) != ["policy-manifest", "sudoers"]:
-        fail("deployment must contain exactly one policy-manifest and sudoers generator")
+    expected_generated = (["policy-manifest", "sudoers"]
+                          + ["report-endpoint"] * len(identities))
+    if sorted(generated) != sorted(expected_generated):
+        fail("deployment generators must match the policy manifest, sudoers, and identities")
+    generated_endpoints = {
+        item["destination"] for item in deployment["files"]
+        if item.get("generated") == "report-endpoint"
+    }
+    if generated_endpoints != {identity["endpoint"] for identity in identities}:
+        fail("generated report endpoints must exactly match identity endpoints")
     for item in deployment["files"]:
         destination = item["destination"]
         if (destination.startswith("/opt/ai-auditor/")
@@ -174,6 +207,17 @@ def render_sudoers(documents: dict[str, Any]) -> bytes:
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
+def render_report_endpoint(profile: str) -> bytes:
+    """Render a zero-argument launcher bound to one validated profile."""
+    return ("#!/bin/bash\n"
+            "set -euo pipefail\n"
+            "if [ \"$#\" -ne 0 ]; then\n"
+            "    echo \"report endpoint does not accept arguments\" >&2\n"
+            "    exit 2\n"
+            "fi\n"
+            f"exec /opt/ai-auditor/lib/report {profile}\n").encode("utf-8")
+
+
 def write_staged(path: Path, content: bytes, mode: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(content)
@@ -201,7 +245,8 @@ def validate_runtime(entries: list[dict[str, str]], contents: dict[str, bytes],
         content = contents[entry["bundle_path"]]
         if destination.endswith(".py"):
             compile(content, destination, "exec")
-        elif destination.startswith("/opt/ai-auditor/bin/"):
+        elif (entry.get("source", "").endswith(".sh")
+              or entry.get("generated") == "report-endpoint"):
             candidate = validation_dir / entry["id"]
             write_staged(candidate, content, 0o700)
             if subprocess.run(["/usr/bin/bash", "-n", str(candidate)], check=False).returncode:
@@ -234,14 +279,22 @@ def resolve_bundle(documents: dict[str, Any], module_dir: Path
         "policy-manifest": compile_manifest(documents),
         "sudoers": render_sudoers(documents),
     }
+    endpoint_profiles = {
+        identity["endpoint"]: identity["profile"]
+        for identity in documents["identities"]["identities"]
+    }
     entries = []
     contents = {}
     for directory in documents["deployment"]["directories"]:
         entries.append({"kind": "directory", "bundle_path": bundle_path(directory["destination"]),
                         **directory})
     for item in documents["deployment"]["files"]:
-        content = (source_bytes(module_dir, item["source"])
-                   if "source" in item else generated[item["generated"]])
+        if "source" in item:
+            content = source_bytes(module_dir, item["source"])
+        elif item["generated"] == "report-endpoint":
+            content = render_report_endpoint(endpoint_profiles[item["destination"]])
+        else:
+            content = generated[item["generated"]]
         path = bundle_path(item["destination"])
         metadata = {field: item[field]
                     for field in ("id", "destination", "owner", "group", "mode")}
@@ -265,6 +318,7 @@ def build_index(policy_sha256: str, entries: list[dict[str, str]]) -> bytes:
 def render_bundle(policy_dir: Path, module_dir: Path, validation_dir: Path
                   ) -> tuple[list[dict[str, str]], dict[str, bytes], bytes, str]:
     documents, policy_digest = load_policy(policy_dir)
+    documents = resolve_identity_collectors(documents)
     validate_policy(documents, module_dir)
     entries, contents = resolve_bundle(documents, module_dir)
     validate_runtime(entries, contents, validation_dir)

@@ -24,7 +24,7 @@ The current Hermes-on-audited-host arrangement is a temporary test topology. Its
 ## Enforced controls
 
 - One no-argument sanitized report command, executed only as `root:root`
-- Root-only (`0700`) raw collector, analyzer, and sanitizer helpers absent from sudoers
+- Root-only (`0700`) report runner, raw collector, analyzer, and sanitizer helpers absent from sudoers
 - Root ownership and non-writable installed collector/sudoers paths
 - Absolute child executable paths and a fixed environment
 - Closed stdin, per-command timeout, isolated process group, and bounded stdout/stderr capture

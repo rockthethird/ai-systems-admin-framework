@@ -18,6 +18,13 @@ if [ -e "$SOURCE_APPROVAL" ]; then
     source_approval_sha256="$(sha256sum "$SOURCE_APPROVAL" | cut -d' ' -f1)"
 fi
 
+approve_bundle() {
+    local digest="$1" policy="$2"
+    printf 'llllll%s\n' "$digest" | script -qfec \
+        "stty rows 24 cols 80; exec env TERM=xterm-256color python3 '$policy' review" \
+        /dev/null >/dev/null
+}
+
 mkdir -p "$REPO_ROOT/modules"
 cp -a "$SOURCE_MODULE_DIR" "$MODULE_DIR"
 rm -rf "$MODULE_DIR/deploy/.state"
@@ -48,8 +55,16 @@ fi
 
 python3 "$POLICY" build >/dev/null
 test "$(stat -c %a "$MODULE_DIR/deploy/artifacts/rootfs/opt/ai-auditor")" = "755"
+bash -s -- "$MODULE_DIR/deploy/artifacts" "$MODULE_DIR/deploy/scripts/lib/identities.sh" <<'SH'
+set -euo pipefail
+readonly ARTIFACTS_DIR="$1"
+fail() { echo "$*" >&2; exit 1; }
+source "$2"
+load_auditor_users
+[[ "${AUDITOR_USERS[*]}" == "ai-auditor-cloud ai-auditor-local" ]]
+SH
 bundle_sha256="$(sha256sum "$MODULE_DIR/deploy/artifacts/artifact-index.json" | cut -d' ' -f1)"
-printf '%s\n' "$bundle_sha256" | script -qfec "python3 '$POLICY' review" /dev/null >/dev/null
+approve_bundle "$bundle_sha256" "$POLICY"
 
 touch "$DIRTY_MARKER"
 if sudo -n "$DEPLOY" --check >/dev/null 2>&1; then
@@ -86,8 +101,7 @@ readonly UNVERSIONED_POLICY="$UNVERSIONED_MODULE/deploy/scripts/policy.py"
 readonly UNVERSIONED_DEPLOY="$UNVERSIONED_MODULE/deploy/scripts/deploy.sh"
 python3 "$UNVERSIONED_POLICY" build >/dev/null
 unversioned_digest="$(sha256sum "$UNVERSIONED_MODULE/deploy/artifacts/artifact-index.json" | cut -d' ' -f1)"
-printf '%s\n' "$unversioned_digest" | script -qfec \
-    "python3 '$UNVERSIONED_POLICY' review" /dev/null >/dev/null
+approve_bundle "$unversioned_digest" "$UNVERSIONED_POLICY"
 if sudo -n "$UNVERSIONED_DEPLOY" --check >/dev/null 2>&1; then
     echo "deployment preflight accepted unversioned source without override" >&2
     exit 1
